@@ -25,10 +25,10 @@ import java.net.Socket;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
-    private Socket socket; //연결 소켓
+    private java.net.Socket socket; //연결 소켓
     private BufferedReader in; //읽어오는 버퍼
     private BufferedWriter out; //쓰는 버퍼
-    private String ip = "xxx.xxx.xxx.xxx"; //연결 IP
+    private String ip = "127.0.0.1"; //연결 IP
     private int port = 9999; //연결 포트
 
     //와이파이 받아오기용 변수
@@ -51,14 +51,20 @@ public class MainActivity extends AppCompatActivity {
 
         wifiMan = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
 
-/*        try {
-            socket = new Socket(ip, port);
-            out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-        } catch (IOException e) {
-            Log.i("Socket Error", e.toString());
-            e.printStackTrace();
-        }*/
+        Thread socketWorker = new Thread() {
+            public void run() {
+                try {
+                    socket = new Socket(ip, port);
+                    out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+                    in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                } catch (IOException e) {
+                    Log.i("Socket Connect", "Connect Error.");
+                    e.printStackTrace();
+                }
+            }
+        };
+
+        socketWorker.start();
     }
 
     private BroadcastReceiver Receiver = new BroadcastReceiver() {
@@ -70,21 +76,13 @@ public class MainActivity extends AppCompatActivity {
             Log.i("List Test", String.format("%d network found", results.size()));
             for (ScanResult result : results) {
 
-               /* 참고용 코드
-                int newRssi = wifiMan.getConnectionInfo().getRssi();
-                int level = wifiMan.calculateSignalLevel(newRssi, 10);
-                int percentage = (int) ((level/10.0)*100);
-                String macAdd = wifiMan.getConnectionInfo().getBSSID();
-                Log.i("Connection Test", String.format("RSSI : %d, LEVEL : %d, PERC : %d, MAC : %S", newRssi, level, percentage, macAdd));*/
-
                 Log.i("List Test", String.format("SSID : %s, BSSID : %s, Level : %d, Freq : %d", result.SSID, result.BSSID, result.level, result.frequency));
 
-/*              소켓통신용
                 try {
                     out.write(String.format("SSID : %s, BSSID : %s, Level : %d, Freq : %d", result.SSID, result.BSSID, result.level, result.frequency));
                 } catch (IOException e) {
                     e.printStackTrace();
-                }*/
+                }
             }
         }
     };
@@ -101,5 +99,11 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy(){
         super.onDestroy();
         unregisterReceiver(Receiver);
+
+        try {
+            socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }
