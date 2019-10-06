@@ -43,7 +43,7 @@ public:
 	void close_sock();
 	bool operator==(CLIENT other);
 	size_t send_msg(char *msg);
-	char* recv_msg();
+	int recv_msg(char* buf);
 
 	/*
 	void _handle();*/

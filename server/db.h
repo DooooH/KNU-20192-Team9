@@ -3,7 +3,7 @@
 #include <string>
 #include <mysql.h>
 #include <mutex>
-#pragma once
+#include "viewer.h"
 
 #pragma comment (lib , "libmysql.lib")
 
@@ -21,6 +21,7 @@ public:
 	DB();
 	DB(const char* host, const char* user, const char* passwd, const char* db);
 	bool exit_db();
+	std::string get_all_data(const char* table);
 	std::string search(const char* table, const char* key, const char* value);
 	std::string search(const char* table, const char* column, const char* key, const char* value);
 	bool update(const char* table, const char* target, const char* target_val, const char* column, const char* sub);

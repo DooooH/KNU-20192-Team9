@@ -29,6 +29,7 @@ bool DB::exit_db() {
 	}
 	return false;
 }
+
 /*
 MYSQL_RES sql_query(const char* query) {
 	if ((query_stat = mysql_query(connection, query)) != 0) {
@@ -36,10 +37,30 @@ MYSQL_RES sql_query(const char* query) {
 		return *NULL;
 	}
 }*/
+std::string DB::get_all_data(const char* table) {
+	std::string tmp = "select *from ", result_str;
+	tmp = tmp + table;
+	std::lock_guard<std::mutex> guard(DB_mtx);
+	if ((query_stat = mysql_query(connection, tmp.c_str())) != 0) {
+		std::cout << "Mysql 에러 : " << mysql_error(&conn) << std::endl;
+		DB_mtx.unlock();
+		return NULL;
+	}
+	sql_result = mysql_store_result(connection);
+
+	int num_fields = mysql_num_fields(sql_result);
+	while ((sql_row = mysql_fetch_row(sql_result)) != NULL) {
+		int i;
+		for (i = 0; i < num_fields-1; i++)
+			result_str = result_str + sql_row[i] + " ";
+		result_str = result_str + sql_row[i] + "\n";
+	}
+	mysql_free_result(sql_result);
+	return result_str;
+}
 std::string DB::search(const char* table, const char* key, const char* value) {
 	std::string tmp = "select *from ", result_str;
 	tmp = tmp + table + " where " + key + "=" + "'" + value + "';";
-
 	std::lock_guard<std::mutex> guard(DB_mtx);
 	if ((query_stat = mysql_query(connection, tmp.c_str())) != 0) {
 		std::cout << "Mysql 에러 : " << mysql_error(&conn) << std::endl;
@@ -62,9 +83,9 @@ std::string DB::search(const char* table, const char* key, const char* value) {
 		std::cout << std::endl;*/
 	}
 	mysql_free_result(sql_result);
-	DB_mtx.unlock();
-
+	//DB_mtx.unlock();
 	return result_str;
+	//return result_str;
 }
 std::string DB::search(const char* table, const char* column, const char* key, const char* value) {
 	std::string tmp = "select ", result_str;
@@ -85,7 +106,7 @@ std::string DB::search(const char* table, const char* column, const char* key, c
 			result_str = result_str + sql_row[i] + " ";
 	}
 	mysql_free_result(sql_result);
-	DB_mtx.unlock();
+	//DB_mtx.unlock();
 
 	return result_str;
 }
@@ -98,7 +119,7 @@ bool DB::update(const char* table, const char* target, const char* target_val, c
 		DB_mtx.unlock();
 		return false;
 	}
-	DB_mtx.unlock();
+	//DB_mtx.unlock();
 	return true;
 }
 bool DB::insert(const char* table, int args, ...) {
@@ -118,22 +139,66 @@ bool DB::insert(const char* table, int args, ...) {
 		DB_mtx.unlock();
 		return false;
 	}
-	DB_mtx.unlock();
+	//DB_mtx.unlock();
 	return true;
 }
 
-
+#include <conio.h>
 int DB_handle() {
-	std::string tmp;
+
 	database = &DB("127.0.0.1", "latter2005", "opentime4132@", "project");
-	if (!database->class_stat) {
-		return 0;
+	while (!database->class_stat) {
+		std::cout << "press any key to restart db" << std::endl;
+		_getch();
+		database = &DB("127.0.0.1", "latter2005", "opentime4132@", "project");
 	}
 
-	tmp = database->search("employees", "name", "aaa");
-	database->insert("employees", 3, "5", "'eee'", "'9C-B9-D0-20-55-A1'");
-	std::cout << tmp;
+	init_view();
+	
+	//database->insert("employees", 3, "5", "'eee'", "'9C-B9-D0-20-55-A1'");
+	//std::cout << tmp;
 	//std::cout << "mysql client version : " << mysql_get_client_info() << std::endl;
 	database->exit_db();
 	return 1;
 }
+
+
+/*
+	nana::form fm;
+
+	//Define a label and display a text.
+	nana::label lab{ fm, "Hello, <bold blue size=16>Nana C++ Library</>" };
+	lab.format(true);
+
+	//Define a button and answer the click event.
+	nana::button btn{ fm, "Quit" };
+	btn.events().click([&fm] {
+		fm.close();
+	});
+	nana::label lab{fm, "Hello, <bold blue size=16>Database </>" };
+	lab.format(true);
+	fm.events().click([&fm] {
+		nana::form fm_modal(fm);
+		fm_modal.modality();
+	});
+	nana::button btn{ fm, "Quit" };
+	fm.caption(("Server"));
+
+	fm.div("vert <><<><weight=80% text><>><><weight=24<><button><>><>");
+	fm["text"] << lab;
+	fm["button"] << btn;
+	fm.collocate();
+
+	//Layout management
+	fm.div("vert <><<><weight=80% text><>><><weight=24<><button><>><>");
+	fm["text"] << lab;
+	fm["button"] << btn;
+	fm.collocate();
+
+	//Show the form
+	fm.show();
+
+	//Start to event loop process, it blocks until the form is closed.
+	nana::exec();
+	std::cout << "Hello World!\n";
+	*/

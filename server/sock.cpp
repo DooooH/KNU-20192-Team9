@@ -63,13 +63,13 @@ void CLIENT::close_sock() {
 }
 bool CLIENT::operator==(CLIENT other) { return this == &other; }
 size_t CLIENT::send_msg(char *msg) { return send(this->sock, msg, strlen(msg), NULL); }
-char* CLIENT::recv_msg() {
-	static char tmp[2048];
+int CLIENT::recv_msg(char *buf) {
+	
 	int count;
-	if ((count = recv(this->sock, tmp, MAX_BUF_SIZE, NULL)) == 0)
+	if ((count = recv(this->sock, buf, MAX_BUF_SIZE, NULL)) == 0)
 		return NULL;
-	tmp[count] = '\0';
-	return tmp;
+	buf[count] = '\0';
+	return count;
 }
 
 /*
@@ -103,13 +103,18 @@ void _handle(CLIENT clnt) {
 		while (msg != NULL) {
 			//¸®½ºÆ® ÆÄ½Ì µðºñ¶û ¿¬»ê
 		}
-	}*/
+	}
 	for (std::vector<CLIENT>::iterator iter = client_list.begin(), eiter = client_list.end(); iter != eiter; iter++) {
 		if (*iter == clnt) {
 			client_list.erase(iter);
 			clnt.close_sock();
 			break;
 		}
+	}*/
+	char tmp[2048];
+	while (1) {
+		clnt.recv_msg(tmp);
+		std::cout << tmp << std::endl;
 	}
 }
 
