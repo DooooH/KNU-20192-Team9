@@ -1,4 +1,4 @@
-#include "sock.h"
+ï»¿#include "sock.h"
 
 
 SERVER *server;
@@ -8,13 +8,13 @@ std::mutex client_list_mtx;
 
 SERVER::SERVER() {
 	if ((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == INVALID_SOCKET) {
-		std::cout << "¼­¹ö¼ÒÄÏ ¿¡·¯ : ¼ÒÄÏ»ý¼º" << std::endl;
+		std::cout << "ì„œë²„ì†Œì¼“ ì—ëŸ¬ : ì†Œì¼“ìƒì„±" << std::endl;
 	}
 }
 //SERVER() = delete;
 SERVER::SERVER(ULONG IP, u_short port) {
 	if ((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == INVALID_SOCKET) {
-		std::cout << "¼­¹ö¼ÒÄÏ ¿¡·¯ : ¼ÒÄÏ»ý¼º" << std::endl;
+		std::cout << "ì„œë²„ì†Œì¼“ ì—ëŸ¬ : ì†Œì¼“ìƒì„±" << std::endl;
 		//exit(-1);
 	}
 
@@ -23,11 +23,11 @@ SERVER::SERVER(ULONG IP, u_short port) {
 	addr.sin_port = htons(port);
 
 	if (bind(sock, (sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR) {
-		std::cout << "¼­¹ö¼ÒÄÏ ¿¡·¯ : ¼ÒÄÏ bind" << std::endl;
+		std::cout << "ì„œë²„ì†Œì¼“ ì—ëŸ¬ : ì†Œì¼“ bind" << std::endl;
 		//exit(-1);
 	}
 	if (listen(sock, SOMAXCONN) == SOCKET_ERROR) {
-		std::cout << "¼­¹ö¼ÒÄÏ ¿¡·¯ : ¼ÒÄÏ listen" << std::endl;
+		std::cout << "ì„œë²„ì†Œì¼“ ì—ëŸ¬ : ì†Œì¼“ listen" << std::endl;
 		//exit(-1);
 	}
 }
@@ -82,7 +82,7 @@ void CLIENT::_handle() {
 		MAC = msg;
 		msg = pos;
 		while (msg != NULL) {
-			//¸®½ºÆ® ÆÄ½Ì µðºñ¶û ¿¬»ê
+			//ë¦¬ìŠ¤íŠ¸ íŒŒì‹± ë””ë¹„ëž‘ ì—°ì‚°
 		}
 	}
 }*/
@@ -101,7 +101,7 @@ void _handle(CLIENT clnt) {
 		MAC = msg;
 		msg = pos;
 		while (msg != NULL) {
-			//¸®½ºÆ® ÆÄ½Ì µðºñ¶û ¿¬»ê
+			//ë¦¬ìŠ¤íŠ¸ íŒŒì‹± ë””ë¹„ëž‘ ì—°ì‚°
 		}
 	}
 	for (std::vector<CLIENT>::iterator iter = client_list.begin(), eiter = client_list.end(); iter != eiter; iter++) {
@@ -124,13 +124,17 @@ int android_server() {
 	int addr_len = sizeof(addr);
 
 	server = &SERVER(INADDR_ANY, (u_short)9999);
-
+	
 	while (1) {
 		std::thread clnt_thread;
+		std::cout << "ì—°ê²° ê¸°ë‹¤ë¦¼" << std::endl;
 		tmp = server->server_accept(&addr, &addr_len);
+		std::cout << "ìƒˆ ì—°ê²°" << std::endl;
+
+
 		//tmp = accept(server->sock, (sockaddr*)&addr, &addr_len);
 		CLIENT clnt(tmp, addr);
-		//std::cout << "»õ ¿¬°á" << std::endl;
+		
 		std::lock_guard<std::mutex> guard(client_list_mtx);
 		client_list.push_back(clnt);
 		client_list_mtx.unlock();
@@ -141,6 +145,6 @@ int android_server() {
 		//thread_list_mtx.unlock();
 
 	}
-
+	std::cout << "ì†Œì¼“í•¸ë“¤ ì¢…ë£Œ" << std::endl;
 	return 0;
 }

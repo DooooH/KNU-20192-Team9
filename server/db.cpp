@@ -30,6 +30,24 @@ bool DB::exit_db() {
 	return false;
 }
 
+bool DB::is_mac(std::string mac) { //xx-xx-xx-xx-xx-xx 17자리
+	if (mac.length() != 17)
+		return false;
+	else {
+		register int pos;
+		for (pos = 0; pos < 15; pos += 3) {
+			if (!isalnum(mac[pos]) || !isalnum(mac[pos+1]))
+				return false;
+			if (mac[pos+2] != '-')
+				return false;
+		}
+		if (!isalnum(mac[pos]) || !isalnum(mac[pos + 1]))
+			return false;
+	}
+	return true;
+}
+
+
 /*
 MYSQL_RES sql_query(const char* query) {
 	if ((query_stat = mysql_query(connection, query)) != 0) {
@@ -43,7 +61,6 @@ std::string DB::get_all_data(const char* table) {
 	std::lock_guard<std::mutex> guard(DB_mtx);
 	if ((query_stat = mysql_query(connection, tmp.c_str())) != 0) {
 		std::cout << "Mysql 에러 : " << mysql_error(&conn) << std::endl;
-		DB_mtx.unlock();
 		return NULL;
 	}
 	sql_result = mysql_store_result(connection);
@@ -64,12 +81,10 @@ std::string DB::search(const char* table, const char* key, const char* value) {
 	std::lock_guard<std::mutex> guard(DB_mtx);
 	if ((query_stat = mysql_query(connection, tmp.c_str())) != 0) {
 		std::cout << "Mysql 에러 : " << mysql_error(&conn) << std::endl;
-		DB_mtx.unlock();
 		return NULL;
 	}
 	if ((sql_result = mysql_store_result(connection)) == NULL) {
 		std::cout << "Mysql 에러 : " << mysql_error(&conn) << std::endl;
-		DB_mtx.unlock();
 		return NULL;
 	}
 	int num_fields = mysql_num_fields(sql_result);
@@ -94,7 +109,6 @@ std::string DB::search(const char* table, const char* column, const char* key, c
 	std::lock_guard<std::mutex> guard(DB_mtx);
 	if ((query_stat = mysql_query(connection, tmp.c_str())) != 0) {
 		std::cout << "Mysql 에러 : " << mysql_error(&conn) << std::endl;
-		DB_mtx.unlock();
 		return NULL;
 	}
 	sql_result = mysql_store_result(connection);
@@ -110,13 +124,36 @@ std::string DB::search(const char* table, const char* column, const char* key, c
 
 	return result_str;
 }
-bool DB::update(const char* table, const char* target, const char* target_val, const char* column, const char* sub) {
-	std::string tmp = "update ";
-	tmp = tmp + table + " set " + column + "=" + sub + " where " + target + "=" + target_val;
+bool DB::exist(const char* table, const char* column, const char* target_val) {
+	std::string tmp = "select EXISTS(select * from ";
+	tmp = tmp + table + " where " + column + "=" + target_val+") as success";
 	std::lock_guard<std::mutex> guard(DB_mtx);
 	if ((query_stat = mysql_query(connection, tmp.c_str())) != 0) {
 		std::cout << "Mysql 에러 : " << mysql_error(&conn) << std::endl;
-		DB_mtx.unlock();
+		return NULL;
+	}
+	sql_result = mysql_store_result(connection);
+	sql_row = mysql_fetch_row(sql_result);
+	mysql_free_result(sql_result);
+	if (atoi(*sql_row)) 
+		return true;
+	else 
+		return false;
+}
+bool DB::update(const char* table, const char* target, const char* target_val, int args, ...) {
+	std::string tmp = "update ";
+	tmp = tmp + table + " set ";
+	va_list ap;
+	va_start(ap, args);
+	for (int i = 0; i < args - 1; i++) {
+		tmp = tmp + va_arg(ap, const char*) + "=" + va_arg(ap, const char*) + ", "; //케릭터 형태로 받는게 오버헤드 적음
+	}
+	tmp = tmp + va_arg(ap, const char*) + "=" + va_arg(ap, const char*);
+	va_end(ap);
+	tmp = tmp + " where " + target + "=" + target_val + ";";
+	std::lock_guard<std::mutex> guard(DB_mtx);
+	if ((query_stat = mysql_query(connection, tmp.c_str())) != 0) {
+		std::cout << "Mysql 에러 : " << mysql_error(&conn) << std::endl;
 		return false;
 	}
 	//DB_mtx.unlock();
@@ -128,20 +165,30 @@ bool DB::insert(const char* table, int args, ...) {
 	va_list ap;
 	va_start(ap, args);
 	for (int i = 0; i < args - 1; i++) {
-		tmp = tmp + va_arg(ap, const char*) + ", ";
+		tmp = tmp + va_arg(ap, std::string ) + ", "; //원래 형태가 스트링
 	}
-	tmp = tmp + va_arg(ap, const char*) + ");";
+	tmp = tmp + va_arg(ap, std::string) + ");";
 	va_end(ap);
 	//std::cout << tmp;
 	std::lock_guard<std::mutex> guard(DB_mtx);
 	if ((query_stat = mysql_query(connection, tmp.c_str())) != 0) {
 		std::cout << "Mysql 에러 : " << mysql_error(&conn) << std::endl;
-		DB_mtx.unlock();
 		return false;
 	}
 	//DB_mtx.unlock();
 	return true;
 }
+bool DB::del(const char* table, const char* column, const char* target_val) {
+	std::string tmp = "delete from ";
+	tmp = tmp + table + " where " + column + "=" + target_val;
+	std::lock_guard<std::mutex> guard(DB_mtx);
+	if ((query_stat = mysql_query(connection, tmp.c_str())) != 0) {
+		std::cout << "Mysql 에러 : " << mysql_error(&conn) << std::endl;
+		return false;
+	}
+	return true;
+}
+
 
 #include <conio.h>
 int DB_handle() {
@@ -155,10 +202,11 @@ int DB_handle() {
 
 	init_view();
 	
-	//database->insert("employees", 3, "5", "'eee'", "'9C-B9-D0-20-55-A1'");
+	//database->del("employees", "name", "'eee'");
 	//std::cout << tmp;
 	//std::cout << "mysql client version : " << mysql_get_client_info() << std::endl;
 	database->exit_db();
+	std::cout << "db헨들 종료" << std::endl;
 	return 1;
 }
 

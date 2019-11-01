@@ -8,6 +8,7 @@
 #include <nana/gui/widgets/label.hpp>
 #include <nana/gui/widgets/button.hpp>
 #include <nana/gui/widgets/listbox.hpp>
+#include <nana/gui/widgets/textbox.hpp>
 
 #include "db.h"
 
