@@ -4,17 +4,13 @@
 nana::form *main_view_ptr;
 
 
-std::vector<std::string> split(std::string str, char delimiter) {
-	std::vector<std::string> internal;
-	std::stringstream ss(str);
-	std::string temp;
-
-	while (getline(ss, temp, delimiter)) {
-		internal.push_back(temp);
-	}
-
-	return internal;
-}
+//bool in_polygon(point pos, std::vector <point> poly) {
+//	
+//	bool result;
+//	for (int i = 0; i < poly.size(); i++) {
+//
+//	}
+//}
 
 void init_list(nana::listbox *emp_list) {
 	std::string tmp = database->get_all_data("employees");
@@ -212,7 +208,7 @@ void init_view() {
 	});
 
 	//add
-	nana::button db_insert{ main_view, nana::rectangle(300, 10, 40, 20), true };
+	nana::button db_insert{ main_view, nana::rectangle(450, 12, 40, 20), true };
 	db_insert.caption("Add");
 	db_insert.events().click([&] {
 		nana::form fm(main_view);
@@ -264,15 +260,98 @@ void init_view() {
 			fm.close();
 		});
 
+
+
 		fm.div("margin=10 vert <title><><>");
 		fm["title"] << input_id_title << input_name_title << input_MAC_title;
 
 		fm.collocate();
 		fm.modality();
 	});
+	//map
+	nana::nested_form draw_form(main_view, nana::rectangle(505, 50, 490, 490), nana::appearance(false, false, false, true, false, false, false));
+	draw_form.bgcolor(nana::color(255, 255, 255));
+
+	nana::drawing dw{ draw_form };
+
+	nana::combox com_floor(main_view, nana::rectangle(680, 12, 50, 20), false);
+	com_floor.caption("floor");
+
+	nana::combox com_building(main_view, nana::rectangle(560, 12, 100, 20), true);
+	com_building.caption("Building");
+	for (auto i : list_building)
+		com_building.push_back(nana::charset(i.bname).to_bytes(nana::unicode::utf8));
+	/*com_building.events().selected([&] {
+		auto pos = com_building.option();
+		for (auto i : list_building[pos].map_list) {
+			com_floor.push_back(std::to_string(i.num_floor));
+		}
+		com_floor.show();
+	});*/
+	bool com_bul_ch = false, com_flo_ch = false;
+	com_building.events().selected([&] {
+		com_bul_ch = true;
+		draw_form.hide();
+		com_floor.clear();
+		auto pos = com_building.option();
+		for (auto i : list_building[pos].map_list) {
+			com_floor.push_back(std::to_string(i.num_floor));
+		}
+		com_floor.show();
+		
+	});
+	com_floor.events().selected([&] {
+		com_flo_ch = true;
+		
+		auto bid = com_building.option(), num_floor = com_floor.option();
+		int size_x = list_building[bid].size_x, size_y = list_building[bid].size_y;
+		double per = (size_y < size_x) ? 480.0 / size_y : 480.0 / size_x;
+		
+		dw.draw([&](nana::paint::graphics& map) {
+			if (com_bul_ch && com_flo_ch) {
+				for (auto i : list_building[bid].map_list[num_floor].room_list) {
+					double x = i.point[0].x * per + 5, y = (size_y - i.point[0].y) * per;
+
+					double next_x, next_y;
+					for (int j = 1; j < i.point.size(); j++) {
+						next_x = i.point[j].x * per + 5; next_y = (size_y - i.point[j].y) * per;
+						map.line(nana::point(x, y), nana::point(next_x, next_y), nana::colors::black);
+						x = next_x; y = next_y;
+					}
+					map.line(nana::point(x, y), nana::point(i.point[0].x * per + 5, (size_y - i.point[0].y) * per), nana::colors::black);
+
+					//방마다 버튼
+					/*nana::button room_info{ draw_form, nana::rectangle(x, y-20, 40, 20), true };
+					room_info.caption(nana::charset(i.rname).to_bytes(nana::unicode::utf8));
+					room_info.events().click([&] {
+						nana::form fm;
+						fm.modality();
+					});*/
+				}
+			}
+		});
+		
+		dw.update();
+		draw_form.show();
+		com_bul_ch = false;
+		com_flo_ch = false;
+	});
+
+	main_view.div("<vert margin=[5, 10] < weight=7% <list_title>> <<list> <>> >");
+	main_view["list_title"] << list_title << map_title;
+	//fm["btns"] << quit;
+	main_view["list"] << emp_list;
+
+	main_view.collocate();
+	main_view.show();
+	nana::exec();
+}
 
 
-	//delete
+
+
+
+//delete
 	/*nana::button db_del{ main_view, nana::rectangle(360, 10, 40, 20), true };
 	db_del.caption("Delete");
 	db_del.events().click([&] {
@@ -312,13 +391,3 @@ void init_view() {
 		fm.collocate();
 		fm.modality();
 	});*/
-
-	main_view.div("<vert margin=[5, 5] < weight=7% <list_title>> <<list> <>> >");
-	main_view["list_title"] << list_title << map_title;
-	//fm["btns"] << quit;
-	main_view["list"] << emp_list;
-
-	main_view.collocate();
-	main_view.show();
-	nana::exec();
-}
