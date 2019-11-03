@@ -14,15 +14,12 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 
-import java.io.BufferedOutputStream;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
+import java.net.NetworkInterface;
 import java.net.Socket;
+import java.util.Collections;
 import java.util.List;
 
 import static java.lang.Thread.sleep;
@@ -64,7 +61,7 @@ public class MainActivity extends AppCompatActivity implements Runnable {
         Socket socket = null; //연결 소켓
         OutputStream out = null; //쓰는 버퍼
         InputStream in = null; //읽어오는 버퍼
-        String ip = "172.30.1.30"; //연결 IP
+        String ip = "20.20.0.101"; //연결 IP
         int port = 9999; //연결 포트
 
         try { //소켓 연결
@@ -81,11 +78,12 @@ public class MainActivity extends AppCompatActivity implements Runnable {
         try {
             while(!done) { //어플리케이션 종료시까지
                 results = wifiMan.getScanResults();
+                String mac = getMACAddress("wlan0");
 
                 Log.i("List Test", String.format("%d network found", results.size()));
 
                 for (ScanResult result : results) { //와이파이 정보 전송
-                    String txt = String.format("SSID : %s, BSSID : %s, Level : %d, Freq : %d*", result.SSID, result.BSSID, result.level, result.frequency);
+                    String txt = String.format("%s %s %d %d*", mac, result.BSSID, result.level, result.frequency);
                     Log.i("List Test", txt);
                     byte[] outText  = txt.getBytes();
                     out.write(outText);
@@ -107,6 +105,26 @@ public class MainActivity extends AppCompatActivity implements Runnable {
             e.printStackTrace();
         }
         Log.i("Socket Test", "Socket Closed.");
+    }
+
+    public static String getMACAddress(String interfaceName) {
+        try {
+            List<NetworkInterface> interfaces = Collections.list(NetworkInterface.getNetworkInterfaces());
+            for (NetworkInterface intf : interfaces) {
+                if (interfaceName != null) {
+                    if (!intf.getName().equalsIgnoreCase(interfaceName)) continue;
+                }
+                byte[] mac = intf.getHardwareAddress();
+                if (mac==null) return "";
+                StringBuilder buf = new StringBuilder();
+                for (int idx=0; idx<mac.length; idx++)
+                    buf.append(String.format("%02X:", mac[idx]));
+                if (buf.length()>0) buf.deleteCharAt(buf.length()-1);
+                return buf.toString();
+            }
+        } catch (Exception ex) { }
+
+        return "";
     }
 
     public void onReset(View view) { //리셋버튼 눌렀을 시 interrupt 발생, 다시 정보 발송
