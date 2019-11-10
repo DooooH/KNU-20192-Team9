@@ -5,8 +5,9 @@
 #include <vector>
 #include <thread>
 #include <mutex>
+#include "db.h"
 #pragma comment (lib , "ws2_32.lib")
-#define MAX_BUF_SIZE 2048
+#define MAX_BUF_SIZE 4096
 
 class SERVER {
 private:
@@ -31,11 +32,12 @@ class CLIENT {
 private:
 	std::string MAC;
 	ULONG IP;
-	SOCKET sock;
+	
 	sockaddr_in addr;
 	//std::thread::id thread_id;
 
 public:
+	SOCKET sock;
 	CLIENT();
 	CLIENT(SOCKET sock, sockaddr_in addr);
 	//CLIENT(SOCKET sock, sockaddr_in addr, std::thread::id thread_id);
@@ -43,15 +45,12 @@ public:
 	void close_sock();
 	bool operator==(CLIENT other);
 	size_t send_msg(char *msg);
-	int recv_msg(char* buf);
-
+	int recv_msg(char (*buf)[MAX_BUF_SIZE]);
 	/*
 	void _handle();*/
 };
 
-void _handle(CLIENT clnt);
 int android_server();
-
 
 extern SERVER *server;
 extern std::vector <CLIENT> client_list;

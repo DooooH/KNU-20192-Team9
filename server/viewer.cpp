@@ -2,15 +2,19 @@
 #include "viewer.h"
 
 nana::form *main_view_ptr;
+nana::listbox *emp_list_ptr;
 
 
-//bool in_polygon(point pos, std::vector <point> poly) {
-//	
-//	bool result;
-//	for (int i = 0; i < poly.size(); i++) {
-//
-//	}
-//}
+
+void update_absence(int clnt_id, std::string pos) {
+	for (auto i : emp_list_ptr->at(0)) {
+		std::string id = "00"+std::to_string(clnt_id);
+		if (i.text(0) == id) {
+			i.text(3, nana::charset(pos).to_bytes(nana::unicode::utf8));
+			return;
+		}
+	}
+}
 
 void init_list(nana::listbox *emp_list) {
 	std::string tmp = database->get_all_data("employees");
@@ -19,8 +23,11 @@ void init_list(nana::listbox *emp_list) {
 
 	for (auto i : line_vector) {
 		patch_row = split(i, ' ');
-
-		emp_list->at(0).append({ patch_row[0] , patch_row[1], patch_row[2] });
+		int size = patch_row[0].length();
+		for (int j = 0; j < 3 - size; j++) {
+			patch_row[0] = "0" + patch_row[0];
+		}
+		emp_list->at(0).append({ patch_row[0] , patch_row[1], patch_row[2], "	X" });
 
 	}
 	//emp_list.
@@ -82,6 +89,7 @@ void popup(std::string msg, nana::form par) {
 void init_view() {
 	std::string tmp;
 	static nana::form main_view;
+	main_view_ptr = &main_view;
 	const nana::size si = { 1000, 600 };
 	nana::API::track_window_size(main_view, si, true);
 	nana::API::track_window_size(main_view, si, false);
@@ -89,9 +97,11 @@ void init_view() {
 	main_view.caption(("Server"));
 
 	nana::listbox emp_list(main_view, true);
+	emp_list_ptr = &emp_list;
 	emp_list.append_header("id");
 	emp_list.append_header("name");
 	emp_list.append_header("MAC");
+	emp_list.append_header("Absence");
 	init_list(&emp_list);
 	/*if (emp_list.sortable())
 		std::cout << "소트가능";
@@ -232,19 +242,22 @@ void init_view() {
 			std::string id, name, mac;
 			input_id.getline(0, id); input_name.getline(0, name); input_MAC.getline(0, mac);
 			if (!DB::is_mac(mac)) {
-				popup("Modify fail : Invalid MAC address", fm);
+				popup("Add fail : Invalid MAC address", fm);
 				fm.close(); return;
 			}
-			name = "'" + name + "'";
-			mac = "'" + mac + "'";
 			//std::cout << id << name << mac;
 
 			if (database->exist("employees", "id", id.c_str()))
 				popup("Add fail: Duplicate ID", fm);
 			else {
-				if (database->insert("employees", 3, id, name, mac)) {
+				//name = nana::charset(name).to_bytes(nana::unicode::utf8);
+				//std::wstring tmp;
+				//tmp.assign(name.begin(), name.end());
+				std::cout << "insert " << name << std::endl; //
+				if (database->insert("employees", 3, id, "'" + name + "'", "'" + mac + "'")) {
 					popup("Added Successfully", fm);
 					emp_list.at(0).append({ id, name, mac });
+					
 					//init_list(&emp_list);
 				}
 				else
@@ -290,52 +303,46 @@ void init_view() {
 	});*/
 	bool com_bul_ch = false, com_flo_ch = false;
 	com_building.events().selected([&] {
-		com_bul_ch = true;
+		//com_bul_ch = true;
 		draw_form.hide();
 		com_floor.clear();
 		auto pos = com_building.option();
 		for (auto i : list_building[pos].map_list) {
 			com_floor.push_back(std::to_string(i.num_floor));
 		}
+		com_floor.events().selected([&] {
+			//com_flo_ch = true;
+
+			auto bid = com_building.option(), num_floor = com_floor.option();
+			int size_x = list_building[bid].size_x, size_y = list_building[bid].size_y;
+			double per = (size_y < size_x) ? 480.0 / size_y : 480.0 / size_x;
+
+			dw.draw([&](nana::paint::graphics& map) {
+				//if (com_bul_ch && com_flo_ch) {
+					for (auto i : list_building[bid].map_list[num_floor].room_list) {
+						double x = i.point[0].x * per + 5, y = (size_y - i.point[0].y) * per;
+
+						//map.string(nana::point(x, y-20), nana::charset(i.rname).to_bytes(nana::unicode::utf8));
+						double next_x, next_y;
+						for (int j = 1; j < i.point.size(); j++) {
+							next_x = i.point[j].x * per + 5; next_y = (size_y - i.point[j].y) * per;
+							map.line(nana::point(x, y), nana::point(next_x, next_y), nana::colors::black);
+							x = next_x; y = next_y;
+						}
+						map.line(nana::point(x, y), nana::point(i.point[0].x * per + 5, (size_y - i.point[0].y) * per), nana::colors::black);
+
+
+					}
+				//}
+			});
+
+			dw.update();
+			draw_form.show();
+		});
 		com_floor.show();
 		
 	});
-	com_floor.events().selected([&] {
-		com_flo_ch = true;
-		
-		auto bid = com_building.option(), num_floor = com_floor.option();
-		int size_x = list_building[bid].size_x, size_y = list_building[bid].size_y;
-		double per = (size_y < size_x) ? 480.0 / size_y : 480.0 / size_x;
-		
-		dw.draw([&](nana::paint::graphics& map) {
-			if (com_bul_ch && com_flo_ch) {
-				for (auto i : list_building[bid].map_list[num_floor].room_list) {
-					double x = i.point[0].x * per + 5, y = (size_y - i.point[0].y) * per;
-
-					double next_x, next_y;
-					for (int j = 1; j < i.point.size(); j++) {
-						next_x = i.point[j].x * per + 5; next_y = (size_y - i.point[j].y) * per;
-						map.line(nana::point(x, y), nana::point(next_x, next_y), nana::colors::black);
-						x = next_x; y = next_y;
-					}
-					map.line(nana::point(x, y), nana::point(i.point[0].x * per + 5, (size_y - i.point[0].y) * per), nana::colors::black);
-
-					//방마다 버튼
-					/*nana::button room_info{ draw_form, nana::rectangle(x, y-20, 40, 20), true };
-					room_info.caption(nana::charset(i.rname).to_bytes(nana::unicode::utf8));
-					room_info.events().click([&] {
-						nana::form fm;
-						fm.modality();
-					});*/
-				}
-			}
-		});
-		
-		dw.update();
-		draw_form.show();
-		com_bul_ch = false;
-		com_flo_ch = false;
-	});
+	
 
 	main_view.div("<vert margin=[5, 10] < weight=7% <list_title>> <<list> <>> >");
 	main_view["list_title"] << list_title << map_title;

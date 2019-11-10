@@ -63,12 +63,11 @@ void CLIENT::close_sock() {
 }
 bool CLIENT::operator==(CLIENT other) { return this == &other; }
 size_t CLIENT::send_msg(char *msg) { return send(this->sock, msg, strlen(msg), NULL); }
-int CLIENT::recv_msg(char *buf) {
-	
+int CLIENT::recv_msg(char (*buf)[MAX_BUF_SIZE]) {
 	int count;
-	if ((count = recv(this->sock, buf, MAX_BUF_SIZE, NULL)) == 0)
-		return NULL;
-	buf[count] = '\0';
+	if ((count = recv(this->sock, *buf, MAX_BUF_SIZE - 1, 0)) == -1)
+		return -1;
+	(*buf)[count] = '\0';
 	return count;
 }
 
@@ -89,7 +88,20 @@ void CLIENT::_handle() {
 
 
 
-void _handle(CLIENT clnt) {
+void recv_handle(SOCKET clnt) {
+	
+	int recvcnt;
+	char buf[MAX_BUF_SIZE];
+	while (recvcnt = recv(clnt, buf, sizeof(buf) - 1, 0))
+	{
+		if (recvcnt <= 0)
+			continue;
+		buf[recvcnt] = '\0';
+		std::cout << "recv :" << std::endl << buf << std::endl;
+		calc(std::string(buf));
+		buf[0] = '\0';
+		
+	}
 	//std::cout << "asdf";
 
 	/*
@@ -111,40 +123,46 @@ void _handle(CLIENT clnt) {
 			break;
 		}
 	}*/
-	char tmp[2048];
-	while (1) {
-		clnt.recv_msg(tmp);
-		std::cout << tmp << std::endl;
-	}
+	closesocket(clnt);
 }
-
 int android_server() {
-	SOCKET tmp;
+	
 	sockaddr_in addr = { 0 };
 	int addr_len = sizeof(addr);
-
-	server = &SERVER(INADDR_ANY, (u_short)9999);
-	
+	void recv_handle(SOCKET clnt);
+	server = &SERVER(INADDR_ANY, (u_short)8888);
+	std::thread clnt_thread;
+	SOCKET tmp;
 	while (1) {
-		std::thread clnt_thread;
+		
 		std::cout << "연결 기다림" << std::endl;
+		//CLIENT clnt(server->server_accept(&addr, &addr_len), addr);
 		tmp = server->server_accept(&addr, &addr_len);
 		std::cout << "새 연결" << std::endl;
-
-
-		//tmp = accept(server->sock, (sockaddr*)&addr, &addr_len);
-		CLIENT clnt(tmp, addr);
+		/*int recvcnt;
+		char buf[500];
+		while (recvcnt = recv(clnt.sock, buf, sizeof(buf) - 1, 0))
+		{
+			buf[recvcnt] = '\0';
+			printf("%s\n", buf);
+		}*/
 		
-		std::lock_guard<std::mutex> guard(client_list_mtx);
-		client_list.push_back(clnt);
-		client_list_mtx.unlock();
-		clnt_thread = std::thread(&_handle, clnt);
+		
+		//client_list_mtx.lock();
+		//std::lock_guard<std::mutex> guard(client_list_mtx);
+		//client_list.push_back(clnt);
+		//client_list_mtx.unlock();
+		
+		clnt_thread = std::thread (&recv_handle, tmp);
+		//clnt_thread = std::thread(&_handle, clnt);
 		clnt_thread.detach();
+		std::cout << "end " << std::endl;
 		//std::lock_guard<std::mutex> guard(thread_list_mtx);
 		//thread_list.push_back(clnt_thread);
 		//thread_list_mtx.unlock();
 
 	}
+	
 	std::cout << "소켓핸들 종료" << std::endl;
 	return 0;
 }
