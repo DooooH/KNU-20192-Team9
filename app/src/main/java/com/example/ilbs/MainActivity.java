@@ -2,17 +2,24 @@ package com.example.ilbs;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 
 import android.Manifest;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
+import android.widget.TextView;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -62,7 +69,7 @@ public class MainActivity extends AppCompatActivity implements Runnable {
         OutputStream out = null; //쓰는 버퍼
         InputStream in = null; //읽어오는 버퍼
         String ip = "20.20.0.101"; //연결 IP
-        int port = 9999; //연결 포트
+        int port = 8888; //연결 포트
 
         try { //소켓 연결
             socket = new Socket(ip, port);
@@ -75,22 +82,27 @@ public class MainActivity extends AppCompatActivity implements Runnable {
 
         wifiMan = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE); //와이파이 정보 받아오기
 
+        TextView temp = (TextView) findViewById(R.id.txt);
+
         try {
             while(!done) { //어플리케이션 종료시까지
                 results = wifiMan.getScanResults();
-                String mac = getMACAddress("wlan0");
+                String txt = getMACAddress("wlan0") + "\n";
 
                 Log.i("List Test", String.format("%d network found", results.size()));
 
                 for (ScanResult result : results) { //와이파이 정보 전송
-                    String txt = String.format("%s %s %d %d*", mac, result.BSSID, result.level, result.frequency);
-                    Log.i("List Test", txt);
-                    byte[] outText  = txt.getBytes();
-                    out.write(outText);
-                    out.flush();
+                    if (result.SSID.length() > 0 && result.SSID.substring(0,2).equals("E9")) //사용 가능한 와이파이만
+                        txt += String.format("%s %s %d %d\n", result.SSID, result.BSSID, result.level, result.frequency);
+                    Log.i("List Test", String.format("%s %s %d %d\n", result.SSID, result.BSSID, result.level, result.frequency));
                 }
+
+                byte[] outText  = txt.getBytes();
+                out.write(outText);
+                out.flush();
+                txt = "";
                 try {
-                    sleep(1000 * 10); //n초만큼 대기 (현재 10초 -> 1~5분 예정)
+                    sleep(1000 * 20); //n초만큼 대기 (현재 10초 -> 1~5분 예정)
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
@@ -110,24 +122,35 @@ public class MainActivity extends AppCompatActivity implements Runnable {
     public static String getMACAddress(String interfaceName) {
         try {
             List<NetworkInterface> interfaces = Collections.list(NetworkInterface.getNetworkInterfaces());
+
             for (NetworkInterface intf : interfaces) {
                 if (interfaceName != null) {
-                    if (!intf.getName().equalsIgnoreCase(interfaceName)) continue;
+                    if (!intf.getName().equalsIgnoreCase(interfaceName))
+                        continue;
                 }
                 byte[] mac = intf.getHardwareAddress();
-                if (mac==null) return "";
+
+                if (mac == null)
+                    return "";
                 StringBuilder buf = new StringBuilder();
-                for (int idx=0; idx<mac.length; idx++)
+                for (int idx = 0; idx < mac.length; idx++)
                     buf.append(String.format("%02X:", mac[idx]));
-                if (buf.length()>0) buf.deleteCharAt(buf.length()-1);
+
+                if (buf.length() > 0)
+                    buf.deleteCharAt(buf.length()-1);
+
                 return buf.toString();
             }
         } catch (Exception ex) { }
-
         return "";
     }
 
     public void onReset(View view) { //리셋버튼 눌렀을 시 interrupt 발생, 다시 정보 발송
         sThread.interrupt();
+    }
+
+    @Override
+    public void onBackPressed() {
+        super.onBackPressed();
     }
 }
