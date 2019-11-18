@@ -1,156 +1,131 @@
 package com.example.ilbs;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
-import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.text.TextWatcher;
-import android.util.Log;
-import android.view.View;
+import android.os.Handler;
+import android.os.Message;
+import android.widget.CompoundButton;
+import android.widget.Switch;
 import android.widget.TextView;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.NetworkInterface;
-import java.net.Socket;
-import java.util.Collections;
-import java.util.List;
 
-import static java.lang.Thread.sleep;
-
-public class MainActivity extends AppCompatActivity implements Runnable {
-    private static int REQUEST_ACCESS_FINE_LOCATION = 1000;
-    private WifiManager wifiMan; //와이파이 매니저
-    private List<ScanResult> results; //와이파이 리스트
-    private boolean done = false; //스레드 종료 조건
-
-    Thread sThread = new Thread(MainActivity.this);
+public class MainActivity extends AppCompatActivity {
+    private NotificationManager notificationManager;
+    private WifiManager wifiMan;
+    private SocketThread sThread;
+    private boolean onService = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) { //인터넷 권한 확인
-            int permissionCheck = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION);
+        Switch activateSwitch = findViewById(R.id.activate_switch);
+        activateSwitch.setOnCheckedChangeListener(new threadActivateListener());
 
-            if (permissionCheck == PackageManager.PERMISSION_DENIED) {
-                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_ACCESS_FINE_LOCATION);
-            }
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+            checkPermission();
 
-        sThread.setDaemon(true);
-        sThread.start(); //thread 생성
-    }
-
-    @Override
-    protected void onDestroy() { //종료시 스레드 종료
-        super.onDestroy();
-        done = true;
-        sThread.interrupt();
-    }
-
-    @Override
-    public void run() {
-        Socket socket = null; //연결 소켓
-        OutputStream out = null; //쓰는 버퍼
-        InputStream in = null; //읽어오는 버퍼
-        String ip = "20.20.0.101"; //연결 IP
-        int port = 8888; //연결 포트
-
-        try { //소켓 연결
-            socket = new Socket(ip, port);
-            out = socket.getOutputStream();
-            in = socket.getInputStream();
-        } catch (IOException e) {
-            Log.i("Socket Connect", "Error.");
-            e.printStackTrace();
-        }
-
-        wifiMan = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE); //와이파이 정보 받아오기
-
-        TextView temp = (TextView) findViewById(R.id.txt);
-
-        try {
-            while(!done) { //어플리케이션 종료시까지
-                results = wifiMan.getScanResults();
-                String txt = getMACAddress("wlan0") + "\n";
-
-                Log.i("List Test", String.format("%d network found", results.size()));
-
-                for (ScanResult result : results) { //와이파이 정보 전송
-                    if (result.SSID.length() > 0 && result.SSID.substring(0,2).equals("E9")) //사용 가능한 와이파이만
-                        txt += String.format("%s %s %d %d\n", result.SSID, result.BSSID, result.level, result.frequency);
-                    Log.i("List Test", String.format("%s %s %d %d\n", result.SSID, result.BSSID, result.level, result.frequency));
-                }
-
-                byte[] outText  = txt.getBytes();
-                out.write(outText);
-                out.flush();
-                txt = "";
-                try {
-                    sleep(1000 * 20); //n초만큼 대기 (현재 10초 -> 1~5분 예정)
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        try {
-            socket.close(); //소켓 닫기
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        Log.i("Socket Test", "Socket Closed.");
-    }
-
-    public static String getMACAddress(String interfaceName) {
-        try {
-            List<NetworkInterface> interfaces = Collections.list(NetworkInterface.getNetworkInterfaces());
-
-            for (NetworkInterface intf : interfaces) {
-                if (interfaceName != null) {
-                    if (!intf.getName().equalsIgnoreCase(interfaceName))
-                        continue;
-                }
-                byte[] mac = intf.getHardwareAddress();
-
-                if (mac == null)
-                    return "";
-                StringBuilder buf = new StringBuilder();
-                for (int idx = 0; idx < mac.length; idx++)
-                    buf.append(String.format("%02X:", mac[idx]));
-
-                if (buf.length() > 0)
-                    buf.deleteCharAt(buf.length()-1);
-
-                return buf.toString();
-            }
-        } catch (Exception ex) { }
-        return "";
-    }
-
-    public void onReset(View view) { //리셋버튼 눌렀을 시 interrupt 발생, 다시 정보 발송
-        sThread.interrupt();
+        wifiMan = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
     }
 
     @Override
     public void onBackPressed() {
-        super.onBackPressed();
+        if(onService)
+            moveTaskToBack(true);
+        else
+            super.onBackPressed();
+    }
+
+    public void checkPermission() { //인터넷 권한 확인
+        int REQUEST_ACCESS_FINE_LOCATION = 1000;
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_DENIED)
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_ACCESS_FINE_LOCATION);
+    }
+
+    @SuppressLint("HandlerLeak")
+    Handler mainHandler = new Handler() {
+        public void handleMessage(@NonNull Message msg) {
+            TextView textView = findViewById(R.id.connection_text);
+
+            if (msg.what == 0)
+                textView.setText("OFFLINE");
+            else
+                textView.setText("ONLINE");
+        }
+    };
+
+    private void setForegroundService() {
+        final String CHANNEL_ID = "12345";
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+
+            Intent notificationIntent = new Intent(this, MainActivity.class);
+            notificationIntent.setFlags(Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT);
+            PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+
+            NotificationChannel notificationChannel = new NotificationChannel(CHANNEL_ID, "ILBS", NotificationManager.IMPORTANCE_LOW);
+            notificationChannel.enableLights(false);
+            notificationChannel.enableVibration(false);
+            notificationChannel.setSound(null, null);
+            notificationManager.createNotificationChannel(notificationChannel);
+
+            NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
+                    .setContentTitle("ILBS")
+                    .setContentText("ILBS is on service.")
+                    .setSmallIcon(R.drawable.ic_launcher_foreground)
+                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                    .setContentIntent(pendingIntent)
+                    .setAutoCancel(false);
+
+            final Notification notification = builder.build();
+            notification.flags = Notification.FLAG_NO_CLEAR;
+
+            notificationManager.createNotificationChannel(notificationChannel);
+            startForegroundService(notificationIntent);
+        }
+
+    }
+
+    class threadActivateListener implements CompoundButton.OnCheckedChangeListener{
+        @Override
+        public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+            TextView txt = findViewById(R.id.onoff_text);
+            if(isChecked) {
+                txt.setText("ON");
+                setForegroundService();
+                sThread = new SocketThread(wifiMan, mainHandler);
+                sThread.setDaemon(true);
+                sThread.start();
+                sThread.getHandler().sendEmptyMessage(1);
+                onService = true;
+            }
+
+            else {
+                txt.setText("OFF");
+                sThread.getHandler().sendEmptyMessage(0);
+                sThread.interrupt();
+                notificationManager.cancel(1);
+                onService = false;
+            }
+        }
     }
 }
