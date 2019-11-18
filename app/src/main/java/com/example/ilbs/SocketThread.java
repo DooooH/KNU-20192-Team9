@@ -1,13 +1,9 @@
 package com.example.ilbs;
 
-import android.annotation.SuppressLint;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
 import android.os.Handler;
-import android.os.Message;
 import android.util.Log;
-
-import androidx.annotation.NonNull;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -22,28 +18,11 @@ public class SocketThread extends Thread {
     private OutputStream out = null; //쓰는 버퍼
     private InputStream in = null; //읽어오는 버퍼
 
-    private boolean Service = true; //서비스 상태 (On/Off)
     private WifiManager wifiMan; //와이파이 매니저
-    private Handler mHandler; //메인스레드 핸들러
+    private boolean onService = false;
 
-    SocketThread(WifiManager wifiMain, Handler handlerMain) {
+    SocketThread(WifiManager wifiMain) {
         wifiMan = wifiMain;
-        mHandler = handlerMain;
-    }
-
-    @SuppressLint("HandlerLeak")
-    Handler threadHandler = new Handler() {
-        public void handleMessage(@NonNull Message msg) {
-            if (msg.what == 0)
-                Service = false;
-
-            else if (msg.what == 1)
-                Service = true;
-        }
-    };
-
-    public Handler getHandler () {
-        return threadHandler;
     }
 
     private void connect() { //소켓 연결
@@ -58,7 +37,7 @@ public class SocketThread extends Thread {
             Log.i("Socket Connect", "Error.");
         }
 
-        mHandler.sendEmptyMessage(1);
+        Log.i("Test", "Socket Connected.");
     }
 
     private void disconnect() { //소켓 닫기
@@ -66,26 +45,22 @@ public class SocketThread extends Thread {
             socket.close();
         } catch (IOException e) { }
 
-        mHandler.sendEmptyMessage(0);
+        Log.i("Test", "Socket Disconnected.");
     }
 
-    @NonNull
-    private static String getMACAddress() {
+    private static String getMACAddress(String interfaceName) {
         try {
             List<NetworkInterface> interfaces = Collections.list(NetworkInterface.getNetworkInterfaces());
-
             for (NetworkInterface intf : interfaces) {
+                if (interfaceName != null) {
+                    if (!intf.getName().equalsIgnoreCase(interfaceName)) continue;
+                }
                 byte[] mac = intf.getHardwareAddress();
-
-                if (mac == null)
-                    return "";
+                if (mac==null) return "";
                 StringBuilder buf = new StringBuilder();
-                for (int idx = 0; idx < mac.length; idx++)
+                for (int idx=0; idx<mac.length; idx++)
                     buf.append(String.format("%02X:", mac[idx]));
-
-                if (buf.length() > 0)
-                    buf.deleteCharAt(buf.length()-1);
-
+                if (buf.length()>0) buf.deleteCharAt(buf.length()-1);
                 return buf.toString();
             }
         } catch (Exception ex) { }
@@ -97,31 +72,38 @@ public class SocketThread extends Thread {
         connect();
 
         if (socket.isConnected()) {
-            try {
-                while(Service) {
+            onService = true;
+            while (onService) {
+                try {
+                    byte[] inText = new byte[10];
                     List<ScanResult> results = wifiMan.getScanResults(); //와이파이 리스트
-                    String txt = getMACAddress() + "\n";
+                    String txt = getMACAddress("wlan0") + "\n";
 
-                    Log.i("List Test", String.format("%d network found", results.size()));
+                    Log.i("List", String.format("%d network found", results.size()));
 
                     for (ScanResult result : results) { //와이파이 정보 전송
-//                    if (result.SSID.length() > 0 && result.SSID.substring(0,2).equals("E9")) //사용 가능한 와이파이만
+//                  if (result.SSID.length() > 0 && result.SSID.substring(0,2).equals("E9")) //사용 가능한 와이파이만
                         txt += String.format("%s %s %d %d\n", result.SSID, result.BSSID, result.level, result.frequency);
-                        Log.i("List Test", String.format("%s %s %d %d\n", result.SSID, result.BSSID, result.level, result.frequency));
+                        Log.i("List", String.format("%s %s %d %d\n", result.SSID, result.BSSID, result.level, result.frequency));
                     }
 
                     byte[] outText = txt.getBytes();
                     out.write(outText);
                     out.flush();
 
-                    try { //n초 만큼 대기
-                        sleep(1000 * 20);
-                    } catch (InterruptedException e) { disconnect(); }
-                } //while Service on
+                    int size = in.read(inText);
+                    String data = new String(inText, 0, size, "UTF-8");
+                    Log.i("Read Test", String.format("%s", data));
 
-            } catch (IOException e) { }
+                    if (data.charAt(0) == '1') {
+                        disconnect();
+                        sleep(1000 * 10);
+                        connect();
+                    }
+                } catch (IOException e) { } catch (InterruptedException e) { disconnect(); onService = false; }
+            }
             disconnect();
         } //if connected
+        Log.i("Test", "Thread Destroy.");
     } //run
-
 } //SocketThread
