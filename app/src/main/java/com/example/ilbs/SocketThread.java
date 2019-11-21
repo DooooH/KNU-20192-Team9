@@ -2,7 +2,9 @@ package com.example.ilbs;
 
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
+import android.os.Bundle;
 import android.os.Handler;
+import android.os.Message;
 import android.util.Log;
 
 import java.io.IOException;
@@ -10,7 +12,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.NetworkInterface;
 import java.net.Socket;
+import java.text.SimpleDateFormat;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 
 public class SocketThread extends Thread {
@@ -19,6 +23,7 @@ public class SocketThread extends Thread {
     private InputStream in = null; //읽어오는 버퍼
 
     private WifiManager wifiMan; //와이파이 매니저
+    private Handler mHandler = ((MainActivity)MainActivity.mContext).mHandler;
     private boolean onService = false;
 
     SocketThread(WifiManager wifiMain) {
@@ -37,7 +42,7 @@ public class SocketThread extends Thread {
             Log.i("Socket Connect", "Error.");
         }
 
-        Log.i("Test", "Socket Connected.");
+        Log.i("Test Message", "Socket Connected.");
     }
 
     private void disconnect() { //소켓 닫기
@@ -45,7 +50,7 @@ public class SocketThread extends Thread {
             socket.close();
         } catch (IOException e) { }
 
-        Log.i("Test", "Socket Disconnected.");
+        Log.i("Test Message", "Socket Disconnected.");
     }
 
     private static String getMACAddress(String interfaceName) {
@@ -75,16 +80,15 @@ public class SocketThread extends Thread {
             onService = true;
             while (onService) {
                 try {
-                    byte[] inText = new byte[10];
+                    byte[] inText = new byte[50];
                     List<ScanResult> results = wifiMan.getScanResults(); //와이파이 리스트
                     String txt = getMACAddress("wlan0") + "\n";
 
-                    Log.i("List", String.format("%d network found", results.size()));
-
+                    Log.i("List Test", String.format("%d network found", results.size()));
                     for (ScanResult result : results) { //와이파이 정보 전송
-//                  if (result.SSID.length() > 0 && result.SSID.substring(0,2).equals("E9")) //사용 가능한 와이파이만
-                        txt += String.format("%s %s %d %d\n", result.SSID, result.BSSID, result.level, result.frequency);
-                        Log.i("List", String.format("%s %s %d %d\n", result.SSID, result.BSSID, result.level, result.frequency));
+                        if (result.SSID.length() > 0 && result.SSID.substring(0,2).equals("E9")) //사용 가능한 와이파이만
+                            txt += String.format("%s %s %d %d\n", result.SSID, result.BSSID, result.level, result.frequency);
+                        Log.i("List Test", String.format("%s %s %d %d\n", result.SSID, result.BSSID, result.level, result.frequency));
                     }
 
                     byte[] outText = txt.getBytes();
@@ -93,17 +97,32 @@ public class SocketThread extends Thread {
 
                     int size = in.read(inText);
                     String data = new String(inText, 0, size, "UTF-8");
-                    Log.i("Read Test", String.format("%s", data));
+                    Log.i("Read Test", String.format("%d: %s", size, data));
+
+                    //sendMsg();
 
                     if (data.charAt(0) == '1') {
                         disconnect();
-                        sleep(1000 * 10);
+                        sleep(1000 * 30);
                         connect();
                     }
-                } catch (IOException e) { } catch (InterruptedException e) { disconnect(); onService = false; }
+                } catch (IOException e) { } catch (InterruptedException e) { onService = false; }
             }
             disconnect();
         } //if connected
-        Log.i("Test", "Thread Destroy.");
+        Log.i("Test Message", "Thread Destroy.");
     } //run
+
+    private void sendMsg () { //구현중
+        Bundle bundle = new Bundle();
+        Message msg = new Message();
+
+        SimpleDateFormat sdfNow = new SimpleDateFormat("HH:mm:ss");
+        String time = "Last Update: " + sdfNow.format(new Date(System.currentTimeMillis()));
+        bundle.putString("time", time);
+        msg.setData(bundle);
+        msg.what = 1;
+
+        mHandler.sendMessage(msg);
+    }
 } //SocketThread

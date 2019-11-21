@@ -5,6 +5,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -16,9 +17,6 @@ import android.util.Log;
 import android.widget.CompoundButton;
 import android.widget.Switch;
 import android.widget.TextView;
-
-import java.text.SimpleDateFormat;
-import java.util.Date;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -40,30 +38,34 @@ public class MainActivity extends AppCompatActivity {
             checkPermission();
 
         if (serviceIntent != null) {
-            TextView ontxt = findViewById(R.id.onoff_text);
-            TextView timetxt = findViewById(R.id.connection_text);
+            TextView onText = findViewById(R.id.onoff_text);
             activateSwitch.setChecked(true);
-            ontxt.setText("ON");
-            timetxt.setText(time);
+            onText.setText("ON");
+            //TextView timeText = findViewById(R.id.connection_text);
+            //timeText.setText(time);
         }
     }
 
     @Override
     protected void onDestroy() {
-        Log.i("Test", "Destroyed.");
+        Log.i("Test Message", "Destroyed.");
+        mContext = null;
         super.onDestroy();
     }
 
-    Handler mHandler = new Handler(){
+    @SuppressLint("HandlerLeak")
+    Handler mHandler = new Handler(){ //구현중
         @Override
         public void handleMessage(Message msg) {
-            super.handleMessage(msg);
-
-            SimpleDateFormat sdfNow = new SimpleDateFormat("HH:mm:ss");
-            time = "Last Update: " + sdfNow.format(new Date(System.currentTimeMillis()));
-
             TextView txt = findViewById(R.id.connection_text);
-            txt.setText(time);
+
+            if (msg.what == 1) {
+                time = msg.getData().getString("time");
+                txt.setText(time);
+            }
+            else {
+                txt.setText("OFFLINE");
+            }
         }
     };
 

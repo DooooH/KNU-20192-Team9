@@ -41,7 +41,7 @@ public class LocationService extends Service {
     public void onDestroy() {
         serviceIntent = null;
         sThread.interrupt();
-        Log.i("Service Test", "Service Destroy.");
+        Log.i("Test Message", "Service Destroy.");
         super.onDestroy();
     }
 
@@ -65,7 +65,7 @@ public class LocationService extends Service {
         } else
             builder = new NotificationCompat.Builder(this);
 
-        builder.setSmallIcon(R.mipmap.ic_launcher).setContentIntent(pendingIntent);
+        builder.setSmallIcon(R.mipmap.ic_launcher).setContentTitle("ILBS is on Service").setContentIntent(pendingIntent);
         startForeground(1, builder.build());
     }
 }

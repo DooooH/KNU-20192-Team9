@@ -36,6 +36,6 @@
         android:layout_height="wrap_content"
         android:layout_marginLeft="40dp"
         android:textSize="25dp"
-        android:text="OFFLINE"/>
+        android:text=""/>
 
 </LinearLayout>
