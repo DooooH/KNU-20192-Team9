@@ -5,31 +5,22 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Message;
 import android.util.Log;
 import android.widget.CompoundButton;
 import android.widget.Switch;
 import android.widget.TextView;
 
-
 public class MainActivity extends AppCompatActivity {
     private static Intent serviceIntent = null;
-    private static String time = "";
-    public static Context mContext;
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        mContext = this;
 
         Switch activateSwitch = findViewById(R.id.activate_switch);
         activateSwitch.setOnCheckedChangeListener(new threadActivateListener());
@@ -41,33 +32,14 @@ public class MainActivity extends AppCompatActivity {
             TextView onText = findViewById(R.id.onoff_text);
             activateSwitch.setChecked(true);
             onText.setText("ON");
-            //TextView timeText = findViewById(R.id.connection_text);
-            //timeText.setText(time);
         }
     }
 
     @Override
     protected void onDestroy() {
         Log.i("Test Message", "Destroyed.");
-        mContext = null;
         super.onDestroy();
     }
-
-    @SuppressLint("HandlerLeak")
-    Handler mHandler = new Handler(){ //구현중
-        @Override
-        public void handleMessage(Message msg) {
-            TextView txt = findViewById(R.id.connection_text);
-
-            if (msg.what == 1) {
-                time = msg.getData().getString("time");
-                txt.setText(time);
-            }
-            else {
-                txt.setText("OFFLINE");
-            }
-        }
-    };
 
     public void checkPermission() { //인터넷 권한 확인
         int REQUEST_ACCESS_FINE_LOCATION = 1000;

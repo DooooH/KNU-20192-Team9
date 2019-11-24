@@ -1,5 +1,6 @@
 package com.example.ilbs;
 
+import android.annotation.SuppressLint;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -7,7 +8,9 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.net.wifi.WifiManager;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Message;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
@@ -15,8 +18,8 @@ import androidx.core.app.NotificationCompat;
 
 public class LocationService extends Service {
     public static Intent serviceIntent = null;
-    private WifiManager wifiMan; //와이파이 매니저
     private SocketThread sThread;
+    private NotificationCompat.Builder builder;
 
     @Nullable
     @Override
@@ -27,10 +30,10 @@ public class LocationService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         serviceIntent = intent;
-        wifiMan = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        WifiManager wifiMan = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
 
         setForegroundService();
-        sThread = new SocketThread(wifiMan);
+        sThread = new SocketThread(wifiMan, mHandler);
         sThread.setDaemon(true);
         sThread.start();
 
@@ -53,7 +56,6 @@ public class LocationService extends Service {
                 .addCategory(Intent.CATEGORY_LAUNCHER);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
 
-        NotificationCompat.Builder builder;
         if (android.os.Build.VERSION.SDK_INT >= 26) {
             NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "ILBS", NotificationManager.IMPORTANCE_LOW);
             channel.enableLights(false);
@@ -65,7 +67,22 @@ public class LocationService extends Service {
         } else
             builder = new NotificationCompat.Builder(this);
 
-        builder.setSmallIcon(R.mipmap.ic_launcher).setContentTitle("ILBS is on Service").setContentIntent(pendingIntent);
+        builder.setSmallIcon(R.mipmap.ic_launcher).setContentTitle("ILBS is on Service").setContentText("Hi.").setContentIntent(pendingIntent);
         startForeground(1, builder.build());
     }
+
+    @SuppressLint("HandlerLeak")
+    Handler mHandler = new Handler(){
+        @Override
+        public void handleMessage(Message msg) {
+            if (msg.what == 0) {
+                builder.setContentText("현재 건물 안에 없습니다.");
+                startForeground(1, builder.build());
+            }
+            else if (msg.what == 1){
+                builder.setContentText(msg.getData().getString("time"));
+                startForeground(1, builder.build());
+            }
+        }
+    };
 }

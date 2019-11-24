@@ -23,15 +23,16 @@ public class SocketThread extends Thread {
     private InputStream in = null; //읽어오는 버퍼
 
     private WifiManager wifiMan; //와이파이 매니저
-    private Handler mHandler = ((MainActivity)MainActivity.mContext).mHandler;
+    private Handler mHandler;
     private boolean onService = false;
 
-    SocketThread(WifiManager wifiMain) {
+    SocketThread(WifiManager wifiMain, Handler handlerMain) {
         wifiMan = wifiMain;
+        mHandler = handlerMain;
     }
 
     private void connect() { //소켓 연결
-        String ip = "172.30.1.30"; //연결 IP
+        String ip = "192.168.123.197"; //연결 IP
         int port = 8888; //연결 포트
 
         try {
@@ -99,13 +100,14 @@ public class SocketThread extends Thread {
                     String data = new String(inText, 0, size, "UTF-8");
                     Log.i("Read Test", String.format("%d: %s", size, data));
 
-                    //sendMsg();
+                    //sendMsg(1);
 
                     if (data.charAt(0) == '1') {
                         disconnect();
                         sleep(1000 * 30);
                         connect();
                     }
+
                 } catch (IOException e) { } catch (InterruptedException e) { onService = false; }
             }
             disconnect();
@@ -113,7 +115,7 @@ public class SocketThread extends Thread {
         Log.i("Test Message", "Thread Destroy.");
     } //run
 
-    private void sendMsg () { //구현중
+    private void sendMsg (int code) {
         Bundle bundle = new Bundle();
         Message msg = new Message();
 
@@ -121,8 +123,7 @@ public class SocketThread extends Thread {
         String time = "Last Update: " + sdfNow.format(new Date(System.currentTimeMillis()));
         bundle.putString("time", time);
         msg.setData(bundle);
-        msg.what = 1;
-
+        msg.what = code;
         mHandler.sendMessage(msg);
     }
 } //SocketThread
