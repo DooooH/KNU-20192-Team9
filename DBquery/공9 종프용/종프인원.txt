@@ -1,0 +1,13 @@
+use project;
+show tables;
+
+create table employees(
+	id int(4) not null primary key,
+	name char(20),
+	MAC_address char(18)
+);
+
+insert into employees values(0, 'jaeuk', 'A8:2B:B9:87:E5:F0');
+insert into employees values(1, 'jisoo', '64:7B:CE:31:24:74');
+insert into employees values(3, 'dohyung_galaxy7', 'A4:84:31:F8:2F:2E');
+select * from employees;

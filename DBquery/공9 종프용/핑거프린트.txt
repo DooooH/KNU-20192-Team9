@@ -1,0 +1,17 @@
+create table fn_print(
+	bid int(2) not null,
+ 	num_floor int(2) not null,
+	x int(4) not null,
+   	y int(4) not null,
+	
+	ap_MAC varchar(18) not null,
+	up_level int(4),
+	right_level int(4),
+	down_level int(4),
+	left_level int(4),
+	foreign key(bid) references building(bid) on update cascade,
+	index index_level(up_level,right_level,down_level,left_level)
+);
+
+#bid 는 0, num_floor = 4, x, y 기준으로
+# insert into fn_print values(0, 1, x, y, 와이파이 MAC, up, right, down, left);

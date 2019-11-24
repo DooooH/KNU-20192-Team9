@@ -1,0 +1,138 @@
+use project;
+
+
+create table building(
+	bid int(2) not null primary key,
+	bname varchar(20),
+	size_x int(4) not null,
+	size_y int(4) not null,
+	size_z int(4) not null,
+	max_floor int(4) not null,
+    index index_bid (bid)
+);
+
+create table map(
+	bid int(2) not null,
+	num_floor int(4) not null,
+    rid int(2) not null,
+    rname varchar(20),
+    start_x int(4) not null,
+    start_y int(4) not null,
+	primary key(bid, num_floor, rid),
+    foreign key(bid) references building(bid) on update cascade,
+    index index_map(bid, num_floor, rid)
+);
+create table room(
+	bid int(2) not null,
+	num_floor int(4) not null,
+	rid int(2) not null,
+    val int(4) not null,
+    foreign key(bid, num_floor, rid) references map(bid, num_floor, rid) on update cascade,
+    index index_room(bid, num_floor, rid)
+);
+
+create table ap_list(
+	bid int(2) not null,
+    num_floor int(2) not null,
+	x int(4) not null,
+    y int(4) not null,
+    z int(4),
+    ap_name varchar(20) not null,
+    ap_freq float(4) not null,
+    ap_MAC varchar(18) not null primary key,
+	foreign key(bid) references building(bid) on update cascade,
+    index index_ap(bid)
+);
+
+
+#building : bid bname size_x size_y size_z max_floor
+insert into building values(0, "°ø´ë9", 86000, 17000, 300, 5);
+
+#ap_list : bit num_floor x y z ap_name ap_freq ap_MAC
+insert into ap_list values(0, 5, 48300, 1000, 300, "E9-521-5Ghz", 5540, "40:e3:d6:5f:61:70");
+insert into ap_list values(0, 5, 48300, 1000, 300, "E9-521-2Ghz", 2437, "40:e3:d6:5f:61:60");
+insert into ap_list values(0, 4, 14000, 17000, 200, "E9-418_5Ghz", 5320, "40:e3:d6:55:40:90");
+insert into ap_list values(0, 4, 14000, 17000, 200, "E9-418_2Ghz", 2437, "40:e3:d6:55:40:80");
+insert into ap_list values(0, 4, 7300, 0, 200, "E9-417_5Ghz", 5620, "40:e3:d6:56:9e:10");
+insert into ap_list values(0, 4, 7300, 0, 200, "E9-417_2Ghz", 2462, "40:e3:d6:56:9e:00");
+insert into ap_list values(0, 4, 22000, 0, 200, "E9-415_5Ghz", 5500, "40:e3:d6:5f:3e:90");
+insert into ap_list values(0, 4, 22000, 0, 200, "E9-415_2Ghz", 2437, "40:e3:d6:5f:3e:80");
+insert into ap_list values(0, 4, 36000, 0, 200, "E9-411_2Ghz", 2412, "40:e3:d6:56:c0:40");
+insert into ap_list values(0, 4, 45500, 0, 200, "E9-409_5Ghz", 5785, "40:e3:d6:5f:61:10");
+insert into ap_list values(0, 4, 45500, 0, 200, "E9-409_2Ghz", 2412, "40:e3:d6:5f:61:00");
+insert into ap_list values(0, 4, 51000, 17000, 200, "E9-408-2_2Ghz", 2462, "40:e3:d6:56:d0:c0");
+insert into ap_list values(0, 4, 56800, 500, 200, "E9-407_5Ghz", 5220, "40:e3:d6:56:79:70");
+insert into ap_list values(0, 4, 56800, 500, 200, "E9-407_2Ghz", 2437, "40:e3:d6:56:79:60");
+insert into ap_list values(0, 4, 65500, 0, 200, "E9-405_5Ghz", 5180, "40:e3:d6:5e:46:d0");
+insert into ap_list values(0, 4, 69000, 0, 200, "E9-403-2_5Ghz", 5600, "40:e3:d6:5f:3d:70");
+
+#map : bid num_floor rid rname startx start_y
+insert into map values(0, 1, 0, "1Ãþº¹µµ", 0, 7000);
+insert into map values(0, 2, 0, "2Ãþº¹µµ", 0, 7000);
+insert into map values(0, 3, 0, "3Ãþº¹µµ", 0, 7000);
+insert into map values(0, 4, 0, "4Ãþº¹µµ", 0, 7000);
+insert into map values(0, 4, 1, "420", 4100, 10000);
+insert into map values(0, 4, 2, "409", 42500, 0);
+insert into map values(0, 4, 3, "407", 53000, 0);
+insert into map values(0, 4, 4, "408-1", 53000, 10000);
+insert into map values(0, 5, 0, "5Ãþº¹µµ", 0, 7000);
+insert into map values(0, 5, 1, "521", 35100, 0);
+
+# 1Ãþº¹µµ : 0
+insert into room values(0, 1, 0, 3000);
+insert into room values(0, 1, 0, 83000);
+insert into room values(0, 1, 0, -3000);
+
+# 2Ãþº¹µµ : 0
+insert into room values(0, 2, 0, 3000);
+insert into room values(0, 2, 0, 83000);
+insert into room values(0, 2, 0, -3000);
+
+# 3Ãþº¹µµ : 0
+insert into room values(0, 3, 0, 3000);
+insert into room values(0, 3, 0, 83000);
+insert into room values(0, 3, 0, -3000);
+
+# 4Ãþº¹µµ : 0
+insert into room values(0, 4, 0, 3000);
+insert into room values(0, 4, 0, 83000);
+insert into room values(0, 4, 0, -3000);
+
+# 420 : 1
+insert into room values(0, 4, 1, 7000);
+insert into room values(0, 4, 1, 13200);
+insert into room values(0, 4, 1, -7000);
+
+# 409 : 2
+insert into room values(0, 4, 2, 7000);
+insert into room values(0, 4, 2, 10500);
+insert into room values(0, 4, 2, -7000);
+
+# 407 : 3
+insert into room values(0, 4, 3, 7000);
+insert into room values(0, 4, 3, 10800);
+insert into room values(0, 4, 3, -7000);
+
+# 408-1 : 4
+insert into room values(0, 4, 4, 7000);
+insert into room values(0, 4, 4, 7300);
+insert into room values(0, 4, 4, -7000);
+
+# 5Ãþº¹µµ : 0
+insert into room values(0, 5, 0, 3000);
+insert into room values(0, 5, 0, 83000);
+insert into room values(0, 5, 0, -3000);
+
+# 521 : 1
+insert into room values(0, 5, 1, 7000);
+insert into room values(0, 5, 1, 14200);
+insert into room values(0, 5, 1, -7000);
+
+
+
+select * from employees;
+select * from building;
+select * from map;
+select * from room;
+select * from ap_list;
+select * from fn_print;
