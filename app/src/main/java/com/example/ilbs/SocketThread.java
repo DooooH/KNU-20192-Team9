@@ -32,7 +32,7 @@ public class SocketThread extends Thread {
     }
 
     private void connect() { //소켓 연결
-        String ip = "192.168.123.197"; //연결 IP
+        String ip = "20.20.1.151"; //연결 IP
         int port = 8888; //연결 포트
 
         try {
@@ -100,13 +100,11 @@ public class SocketThread extends Thread {
                     String data = new String(inText, 0, size, "UTF-8");
                     Log.i("Read Test", String.format("%d: %s", size, data));
 
-                    //sendMsg(1);
+                    sendMsg(data);
 
-                    if (data.charAt(0) == '1') {
-                        disconnect();
-                        sleep(1000 * 30);
-                        connect();
-                    }
+                    disconnect();
+                    sleep(1000 * 60);
+                    connect();
 
                 } catch (IOException e) { } catch (InterruptedException e) { onService = false; }
             }
@@ -115,15 +113,21 @@ public class SocketThread extends Thread {
         Log.i("Test Message", "Thread Destroy.");
     } //run
 
-    private void sendMsg (int code) {
+    private void sendMsg (String data) {
         Bundle bundle = new Bundle();
         Message msg = new Message();
 
-        SimpleDateFormat sdfNow = new SimpleDateFormat("HH:mm:ss");
-        String time = "Last Update: " + sdfNow.format(new Date(System.currentTimeMillis()));
-        bundle.putString("time", time);
+        String[] array = data.split(" ");
+
+        if (array[0] == "1") {
+            SimpleDateFormat sdfNow = new SimpleDateFormat("HH:mm:ss");
+            String time = "Last Update: " + sdfNow.format(new Date(System.currentTimeMillis()));
+            bundle.putString("time", time);
+            String temp = array[1] + " " + array[2] + "층 " + array[3];
+            bundle.putString("location", temp);
+        }
         msg.setData(bundle);
-        msg.what = code;
+        msg.what = Integer.parseInt(array[0]);
         mHandler.sendMessage(msg);
     }
 } //SocketThread
