@@ -8,7 +8,7 @@ nana::listbox *emp_list_ptr;
 
 void update_absence(int clnt_id, std::string pos) {
 	for (auto i : emp_list_ptr->at(0)) {
-		std::string id = "00"+std::to_string(clnt_id);
+		std::string id = "00" + std::to_string(clnt_id);
 		if (i.text(0) == id) {
 			i.text(3, nana::charset(pos).to_bytes(nana::unicode::utf8));
 			return;
@@ -257,7 +257,7 @@ void init_view() {
 				if (database->insert("employees", 3, id, "'" + name + "'", "'" + mac + "'")) {
 					popup("Added Successfully", fm);
 					emp_list.at(0).append({ id, name, mac });
-					
+
 					//init_list(&emp_list);
 				}
 				else
@@ -287,8 +287,11 @@ void init_view() {
 
 	nana::drawing dw{ draw_form };
 
+	nana::combox com_room(main_view, nana::rectangle(780, 12, 100, 20), false);
+	com_room.caption("Room");
+
 	nana::combox com_floor(main_view, nana::rectangle(680, 12, 50, 20), false);
-	com_floor.caption("floor");
+	com_floor.caption("Floor");
 
 	nana::combox com_building(main_view, nana::rectangle(560, 12, 100, 20), true);
 	com_building.caption("Building");
@@ -301,48 +304,86 @@ void init_view() {
 		}
 		com_floor.show();
 	});*/
-	bool com_bul_ch = false, com_flo_ch = false;
+
 	com_building.events().selected([&] {
 		//com_bul_ch = true;
 		draw_form.hide();
+		com_room.hide();
 		com_floor.clear();
+		
 		auto pos = com_building.option();
 		for (auto i : list_building[pos].map_list) {
 			com_floor.push_back(std::to_string(i.num_floor));
 		}
-		com_floor.events().selected([&] {
-			//com_flo_ch = true;
-
-			auto bid = com_building.option(), num_floor = com_floor.option();
-			int size_x = list_building[bid].size_x, size_y = list_building[bid].size_y;
-			double per = (size_y < size_x) ? 480.0 / size_y : 480.0 / size_x;
-
-			dw.draw([&](nana::paint::graphics& map) {
-				//if (com_bul_ch && com_flo_ch) {
-					for (auto i : list_building[bid].map_list[num_floor].room_list) {
-						double x = i.point[0].x * per + 5, y = (size_y - i.point[0].y) * per;
-
-						//map.string(nana::point(x, y-20), nana::charset(i.rname).to_bytes(nana::unicode::utf8));
-						double next_x, next_y;
-						for (int j = 1; j < i.point.size(); j++) {
-							next_x = i.point[j].x * per + 5; next_y = (size_y - i.point[j].y) * per;
-							map.line(nana::point(x, y), nana::point(next_x, next_y), nana::colors::black);
-							x = next_x; y = next_y;
-						}
-						map.line(nana::point(x, y), nana::point(i.point[0].x * per + 5, (size_y - i.point[0].y) * per), nana::colors::black);
-
-
-					}
-				//}
-			});
-
-			dw.update();
-			draw_form.show();
-		});
 		com_floor.show();
+
+	});
+	bool com_floor_selected = false;
+	com_floor.events().selected([&] {
+		com_floor_selected = true;
 		
+		com_room.clear();
+		//com_room.hide();
+		draw_form.hide();
+		
+		short bid = com_building.option(), num_floor = com_floor.option();
+		int size_x = list_building[bid].size_x, size_y = list_building[bid].size_y;
+		double per = (size_y > size_x) ? 480.0 / size_y : 480.0 / size_x;
+
+		for (auto i : list_building[bid].map_list[num_floor].room_list)
+			com_room.push_back(nana::charset(i.rname).to_bytes(nana::unicode::utf8));
+		dw.draw([&](nana::paint::graphics& map) {
+			if (com_floor_selected) {
+				for (auto i : list_building[bid].ap_list) {
+
+				}
+				for (auto i : list_building[bid].map_list[num_floor].room_list) {
+					double x, y;
+					if (size_x > size_y) {
+						x = i.point[0].x * per + 7;
+						y = (250 - size_y * per) + i.point[0].y * per;
+					}
+					else {
+						x = (250 - size_x * per) + i.point[0].x * per;
+						y = i.point[0].y * per + 5;
+					}
+					double next_x, next_y;
+					for (int j = 1; j < i.point.size(); j++) {
+						if (size_x > size_y) {
+							next_x = i.point[j].x * per + 7;
+							next_y = (250 - size_y * per) + i.point[j].y * per;
+						}
+						else {
+							next_x = (250 - size_x * per) + i.point[j].x * per;
+							next_y = i.point[j].y * per + 7;
+						}
+						map.line(nana::point(x, y), nana::point(next_x, next_y), nana::colors::black);
+						x = next_x; y = next_y;
+					}
+					if (size_x > size_y)
+						map.line(nana::point(x, y), nana::point(i.point[0].x * per + 7, (250 - size_y * per) + i.point[0].y * per), nana::colors::black);
+					else
+						map.line(nana::point(x, y), nana::point((250 - size_x * per) + i.point[0].x * per, y = i.point[0].y * per + 7), nana::colors::black);
+				}
+			}
+
+		});
+		
+		draw_form.show();
+		com_floor_selected = false;
+		com_room.show();
 	});
 	
+	//list_building[bid].map_list[num_floor].room_list;
+	com_room.events().selected([&] {
+		short bid = com_building.option(), num_floor = com_floor.option(), rid = com_room.option();
+		//popup room info
+		nana::form fm;
+		//fm.modality();
+	});
+	com_building.show();
+	//com_floor.show();
+	//com_room.show();
 
 	main_view.div("<vert margin=[5, 10] < weight=7% <list_title>> <<list> <>> >");
 	main_view["list_title"] << list_title << map_title;

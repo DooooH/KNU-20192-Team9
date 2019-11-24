@@ -98,7 +98,8 @@ void recv_handle(SOCKET clnt) {
 			continue;
 		buf[recvcnt] = '\0';
 		std::cout << "recv :" << std::endl << buf << std::endl;
-		calc(std::string(buf));
+		if (!calc(std::string(buf)))
+			return;
 		buf[0] = '\0';
 		
 	}

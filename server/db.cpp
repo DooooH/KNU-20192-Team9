@@ -75,11 +75,11 @@ std::string DB::get_all_data(const char* table) {
 	mysql_free_result(sql_result);
 	return result_str;
 }
-std::string DB::search(const char* table, int args, ...) {
+std::string DB::search_eql(const char* table, int args, ...) {
 	std::string tmp = "select *from ", result_str;
 	tmp = tmp + table + " where "; //+ key + "=" + "'" + value + "';";
 	va_list ap;
-	va_start(ap, args);
+	va_start(ap, args * 2);
 	for (int i = 0; i < args - 1; i++) {
 		tmp = tmp + va_arg(ap, const char*) + "=" + va_arg(ap, const char*) + " and "; //케릭터 형태로 받는게 오버헤드 적음
 	}
@@ -112,6 +112,34 @@ std::string DB::search(const char* table, int args, ...) {
 	return result_str;
 	//return result_str;
 }
+std::string DB::get_fnprint_pos(std::string MAC, const char* column, int a, int b) { // 컬럼 작은거 큰거
+	std::string tmp = "select *from fn_print where ap_MAC='" + MAC + "' and " + column + " between " + std::to_string(a) + " and " + std::to_string(b) + ";", result_str;
+	std::lock_guard<std::mutex> guard(DB_mtx);
+	if ((query_stat = mysql_query(connection, tmp.c_str())) != 0) {
+		std::cout << "Mysql 에러 : " << mysql_error(&conn) << std::endl;
+		return NULL;
+	}
+	sql_result = mysql_store_result(connection);
+	int num_fields = mysql_num_fields(sql_result);
+	while ((sql_row = mysql_fetch_row(sql_result)) != NULL) {
+		register int i;
+		for (i = 0; i < num_fields - 1; i++) {
+			if(sql_row[i])
+				result_str = result_str + sql_row[i] + " ";	
+			else
+				result_str = result_str + "1 ";
+		}
+		if (sql_row[i])
+			result_str = result_str + sql_row[i] + "\n";
+		else
+			result_str = result_str + "1\n";
+		
+	}
+	mysql_free_result(sql_result);
+	//DB_mtx.unlock();
+
+	return result_str;
+}
 std::string DB::search(const char* table, const char* column, const char* key, const char* value) {
 	std::string tmp = "select ", result_str;
 	tmp = tmp + column + " from " + table + " where " + key + "=" + "'" + value + "';";
@@ -125,9 +153,10 @@ std::string DB::search(const char* table, const char* column, const char* key, c
 
 	int num_fields = mysql_num_fields(sql_result);
 	while ((sql_row = mysql_fetch_row(sql_result)) != NULL) {
-
-		for (int i = 0; i < num_fields; i++)
+		register int i;
+		for (i = 0; i < num_fields-1; i++)
 			result_str = result_str + sql_row[i] + " ";
+		result_str = result_str + sql_row[i] + "\n";
 	}
 	mysql_free_result(sql_result);
 	//DB_mtx.unlock();
@@ -214,9 +243,36 @@ std::vector<std::string> split(std::string str, char delimiter) {
 
 
 std::vector <building> list_building;
-
-
-
+typedef struct _fn_info {
+	std::string ap_MAC;
+	int up, right, down, left;
+}_fn_info;
+typedef struct _fn_point {
+	int bid, num_floor;
+	int x, y;
+	std::vector <_fn_info> fn_info;
+}_fn_point;
+typedef struct level_info {
+	std::string ap_name, ap_MAC;
+	int level, freq;
+}level_info;
+#define FILTER 5
+struct find_xy : std::unary_function<_fn_point, bool> {
+	int x, y;
+	find_xy(int x, int y) :x(x) ,y(y) { }
+	bool operator()(_fn_point const& m) const {
+		if (m.x == x && m.y == y)
+			return true;
+		return false;
+	}
+};
+struct find_mac : std::unary_function<_fn_info, bool> {
+	std::string mac;
+	find_mac(std::string mac) :mac(mac) { }
+	bool operator()(_fn_info const& m) const {
+		return m.ap_MAC == mac;
+	}
+};
 bool in_room(point pos, std::vector <point> poly) {
 	int bef = 0;
 	bool result = false;
@@ -256,36 +312,89 @@ bool in_room(point pos, std::vector <point> poly) {
 	return result;
 }
 
-
-void calc(std::string input) {
-	
-	std::vector <std::string> line_vector = split(input, '*');
-	if (database->exist("employees", "MAC_address", ("'" + line_vector[0] + "'").c_str())) {
-		
-		line_vector.erase(line_vector.begin());
-		for (auto i : line_vector) {
-			std::vector <std::string> patch_row= split(i,' ');
-			if (database->exist("ap_list", "ap_MAC", ("'" + patch_row[1] + "'").c_str())) {
-				double level = atof(patch_row[2].c_str());
-				if (patch_row[0]=="607_5.0" && level >= -90 && level <= -70) {
-					update_absence(0, "방2");
-					return;
-				}
-				else if (patch_row[0] == "607_5.0" && level >= -35 && level <= -45) {
-					update_absence(0, "거실&주방");
-					return;
-				}
-				//std::string tmp = database->search("ap_list", "ap_name", "MAC_address", ("'" + patch_row[1] + "'").c_str());
-				
-				//std::cout << tmp + ": level" << std::endl;
-			}
-			else
-				continue;
-		}
+void fill_fn_point(std::vector <_fn_point> *target, std::vector <std::string> row) {
+	_fn_point tmp = { atoi(row[0].c_str()) ,atoi(row[1].c_str()) ,atoi(row[2].c_str()) ,atoi(row[3].c_str()) };
+	row[2], row[3]; //x, y
+	auto target_pos = std::find_if(target->begin(), target->end(), find_xy(tmp.x, tmp.y));
+	//if()
+	if (target_pos==target->end()) {	//좌표가 없을때
+		_fn_info tmp_info = { row[4] ,atoi(row[5].c_str()) ,atoi(row[6].c_str()),atoi(row[7].c_str()) ,atoi(row[8].c_str()) };
+		tmp.fn_info.push_back(tmp_info);
+		target->push_back(tmp);
 	}
-	
+	else {								//좌표가 있슬때
+		auto vec_pos = std::find_if(target_pos->fn_info.begin(), target_pos->fn_info.end(), find_mac(row[4]));
+		if (vec_pos == target_pos->fn_info.end()) { //좌표 내 중복 MAC 없음
+			_fn_info tmp_info = { row[4] ,atoi(row[5].c_str()) ,atoi(row[6].c_str()),atoi(row[7].c_str()) ,atoi(row[8].c_str()) };
+			target_pos->fn_info.push_back(tmp_info);
+		}
+		
+	}
 }
 
+bool calc(std::string input) {
+	std::string clnt_mac;
+	std::vector <level_info> clnt_info;
+	std::vector <_fn_point> fn_point_up_list, fn_point_right_list, fn_point_down_list, fn_point_left_list;
+	//database->get_fnprint_pos(std::string("40:e3:d6:5f:3e:80"), "up_level", -90, -80);
+	std::vector <std::string> line_vector = split(input, '\n'), patch_row;
+	clnt_mac = line_vector[0];
+	if (!database->exist("employees", "MAC_address", ("'" + clnt_mac + "'").c_str())) {
+		std::cout << clnt_mac + "클라이언트 목록에 없는 유저" << std::endl;
+		return false;
+	}
+	line_vector.erase(line_vector.begin());
+	for (auto i : line_vector) {
+		patch_row = split(i, ' ');
+		if (database->exist("ap_list", "ap_MAC", ("'" + patch_row[1] + "'").c_str())) {
+			level_info tmp = { patch_row[0], patch_row[1], atoi(patch_row[2].c_str()), atoi(patch_row[3].c_str()) };
+			clnt_info.push_back(tmp);
+			std::vector <std::string> fn_vector = split(database->get_fnprint_pos(tmp.ap_MAC, "up_level", tmp.level - FILTER, tmp.level + FILTER), '\n'), fn_row;
+			for (auto j : fn_vector) {
+				fn_row = split(j, ' ');
+				fill_fn_point(&fn_point_up_list, fn_row);
+				//fn_info.push_back(fn_tmp);
+			}
+			fn_vector = split(database->get_fnprint_pos(tmp.ap_MAC, "right_level", tmp.level - FILTER, tmp.level + FILTER), '\n');
+			for (auto j : fn_vector) {
+				fn_row = split(j, ' ');
+				fill_fn_point(&fn_point_right_list, fn_row);
+				//fn_info.push_back(fn_tmp);
+			}
+		}
+	}
+	/*
+	for (auto i : fn_point_list) {
+		std::cout << i.bid << " " << i.num_floor << " " << i.x << " " << i.y << " : " << std::endl;
+		for (auto j : i.fn_info)
+			std::cout << j.ap_MAC << " " << j.up << " " << j.right << " " << j.down << " " << j.left << std::endl;
+		std::cout << std::endl;
+	}*/
+}
+//std::vector <std::string> line_vector = split(input, '*');
+//if (database->exist("employees", "MAC_address", ("'" + line_vector[0] + "'").c_str())) {
+//	
+//	line_vector.erase(line_vector.begin());
+//	for (auto i : line_vector) {
+//		std::vector <std::string> patch_row= split(i,' ');
+//		if (database->exist("ap_list", "ap_MAC", ("'" + patch_row[1] + "'").c_str())) {
+//			double level = atof(patch_row[2].c_str());
+//			if (patch_row[0]=="607_5.0" && level >= -90 && level <= -70) {
+//				update_absence(0, "방2");
+//				return;
+//			}
+//			else if (patch_row[0] == "607_5.0" && level >= -35 && level <= -45) {
+//				update_absence(0, "거실&주방");
+//				return;
+//			}
+//			//std::string tmp = database->search("ap_list", "ap_name", "MAC_address", ("'" + patch_row[1] + "'").c_str());
+//			
+//			//std::cout << tmp + ": level" << std::endl;
+//		}
+//		else
+//			continue;
+//	}
+//}
 
 
 void init_building(){
@@ -299,14 +408,14 @@ void init_building(){
 		for (int j = 0; j < tmp.max_floor; j++) {
 			map tmp_map = {j+1};
 			
-			std::string map_data = database->search("map", 2,  patch_row[0].c_str(), "bid", std::to_string(j+1).c_str(), "num_floor" );
+			std::string map_data = database->search_eql("map", 2,  patch_row[0].c_str(), "bid", std::to_string(j+1).c_str(), "num_floor" );
 			std::vector <std::string> map_vector = split(map_data, '\n'), patch_row_map;
 			for (auto map_iter : map_vector) {
 				patch_row_map = split(map_iter, ' ');
 				room tmp_room = {patch_row_map[3], atoi(patch_row_map[4].c_str()) , atoi(patch_row_map[5].c_str()) };
 				
 				
-				std::string room_data = database->search("room", 3,  patch_row[0].c_str(), "bid",  std::to_string(j + 1).c_str(), "num_floor",  patch_row_map[2].c_str(), "rid");
+				std::string room_data = database->search_eql("room", 3,  patch_row[0].c_str(), "bid",  std::to_string(j + 1).c_str(), "num_floor",  patch_row_map[2].c_str(), "rid");
 				std::vector <std::string> room_vector = split(room_data, '\n'), patch_row_room;
 				point pos = { tmp_room.start_x, tmp_room.start_y };
 				bool flag = false; // false 상하 true 좌우
@@ -328,7 +437,7 @@ void init_building(){
 				});
 			}
 			tmp.map_list.push_back(tmp_map);
-			std::string ap_data = database->search("ap_list", 1, patch_row[0].c_str(), "bid");
+			std::string ap_data = database->search_eql("ap_list", 1, patch_row[0].c_str(), "bid");
 			std::vector <std::string> ap_vector = split(ap_data, '\n'), patch_row_ap;
 			for (auto ap_iter : ap_vector) {
 				patch_row_ap = split(ap_iter, ' ');
@@ -397,6 +506,7 @@ int DB_handle() {
 		_getch();
 		database = &DB("127.0.0.1", "latter2005", "opentime4132@", "project");
 	}
+	
 	init_building();
 	init_view();
 	

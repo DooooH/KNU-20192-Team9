@@ -25,15 +25,17 @@ public:
 	bool exit_db();
 	static bool is_mac(std::string mac);
 	std::string get_all_data(const char* table);
-	std::string search(const char* table, int args, ...);
+	std::string search_eql(const char* table, int args, ...);
+	std::string get_fnprint_pos(std::string MAC, const char* column, int a, int b);
 	std::string search(const char* table, const char* column, const char* key, const char* value);
+	
 	bool exist(const char* table, const char* column, const char* target_val);
 	bool update(const char* table, const char* target, const char* target_val, int args, ...);
 	bool insert(const char* table, int args, ...);
 	bool del(const char* table, const char* column, const char* target_val);
 };
 int DB_handle();
-void calc(std::string input);
+bool calc(std::string input);
 std::vector<std::string> split(std::string str, char delimiter);
 
 typedef struct point {
