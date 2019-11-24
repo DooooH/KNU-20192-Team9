@@ -112,37 +112,81 @@ std::string DB::search_eql(const char* table, int args, ...) {
 	return result_str;
 	//return result_str;
 }
-std::string DB::get_fnprint_pos(std::string MAC, const char* column, int a, int b) { // 컬럼 작은거 큰거
-	std::string tmp = "select *from fn_print where ap_MAC='" + MAC + "' and " + column + " between " + std::to_string(a) + " and " + std::to_string(b) + ";", result_str;
-	std::lock_guard<std::mutex> guard(DB_mtx);
-	if ((query_stat = mysql_query(connection, tmp.c_str())) != 0) {
-		std::cout << "Mysql 에러 : " << mysql_error(&conn) << std::endl;
-		return NULL;
-	}
-	sql_result = mysql_store_result(connection);
-	int num_fields = mysql_num_fields(sql_result);
-	while ((sql_row = mysql_fetch_row(sql_result)) != NULL) {
-		register int i;
-		for (i = 0; i < num_fields - 1; i++) {
-			if(sql_row[i])
-				result_str = result_str + sql_row[i] + " ";	
-			else
-				result_str = result_str + "1 ";
+
+
+std::vector <_fn_point> DB::get_fnprint_data(std::vector <std::string> MAC, std::vector <int*> value) { // 컬럼 작은거 큰거
+	std::string tmp;
+	std::vector <_fn_point> result;
+	std::vector <std::vector<std::string>> list_pos[4];
+	const char* drec[4] = { "up_level", "right_level", "down_level", "left_level" };
+	//std::lock_guard<std::mutex> guard(DB_mtx);
+	for (int d = 0; d < 4; d++) {
+		for (int i = 0; i < MAC.size(); i++) {
+			tmp = "select bid, num_floor, x, y from fn_print where ap_MAC='" + MAC[i] + "' and " + drec[d] + " between " + std::to_string(value[i][0]) + " and " + std::to_string(value[i][1]) + ";";
+			DB_mtx.lock();
+			if ((query_stat = mysql_query(connection, tmp.c_str())) != 0) {
+				std::cout << "Mysql 에러 : " << mysql_error(&conn) << std::endl;
+				return result;
+			}
+			sql_result = mysql_store_result(connection);
+			int num_fields = mysql_num_fields(sql_result);
+			if (i == 0) while ((sql_row = mysql_fetch_row(sql_result)) != NULL) {
+				//std::string t[] = { sql_row[0], sql_row[1], sql_row[2], sql_row[3] };
+				list_pos[d].push_back({ sql_row[0], sql_row[1], sql_row[2], sql_row[3] });
+			}
+			else {
+				std::vector <std::vector<std::string>> tmp_pos;
+				while ((sql_row = mysql_fetch_row(sql_result)) != NULL) {
+					//std::string t[] = { sql_row[0], sql_row[1], sql_row[2], sql_row[3] };
+					tmp_pos.push_back({ sql_row[0], sql_row[1], sql_row[2], sql_row[3] });
+				}
+				for (int j = list_pos[d].size() - 1; j >= 0; j--) {
+					if (std::find(tmp_pos.begin(), tmp_pos.end(), list_pos[d][j]) == tmp_pos.end()) {
+						list_pos[d].erase(list_pos[d].begin() + j);
+					}
+				}
+			}
+			mysql_free_result(sql_result);
+			DB_mtx.unlock();
 		}
-		if (sql_row[i])
-			result_str = result_str + sql_row[i] + "\n";
-		else
-			result_str = result_str + "1\n";
+	}
+	for (int d = 0; d < 4; d++) {
+		for (auto list_iter : list_pos[d]) {
+			_fn_point tmp_point = { std::atoi(list_iter[0].c_str()), std::atoi(list_iter[1].c_str()) , std::atoi(list_iter[2].c_str()), std::atoi(list_iter[3].c_str()) };
+			if (std::find_if(result.begin(), result.end(), _fn_point(tmp_point)) != result.end())
+				continue;
+			DB_mtx.lock();
+			tmp = std::string("") + "select ap_MAC, " + drec[d] +  " from fn_print where bid=" + list_iter[0] + " and num_floor=" + list_iter[1] + " and x=" + list_iter[2] + " and y=" + list_iter[3] + " order by " + drec[d] + " desc;";
+			if ((query_stat = mysql_query(connection, tmp.c_str())) != 0) {
+				std::cout << "Mysql 에러 : " << mysql_error(&conn) << std::endl;
+				return result;
+			}
+			sql_result = mysql_store_result(connection);
+			
+			while ((sql_row = mysql_fetch_row(sql_result)) != NULL) {
+				_fn_info tmp_info = { sql_row[0]};
+				if (sql_row[1])
+					tmp_info.level = std::atoi(sql_row[1]);
+				else
+					tmp_info.level = -200;
+				
+				tmp_point.fn_info.push_back(tmp_info);
+			}
+			result.push_back(tmp_point);
+
+
+			mysql_free_result(sql_result);
+			DB_mtx.unlock();
+		}
+		
 		
 	}
-	mysql_free_result(sql_result);
-	//DB_mtx.unlock();
-
-	return result_str;
+	return result;
+	
 }
 std::string DB::search(const char* table, const char* column, const char* key, const char* value) {
 	std::string tmp = "select ", result_str;
-	tmp = tmp + column + " from " + table + " where " + key + "=" + "'" + value + "';";
+	tmp = tmp + column + " from " + table + " where " + key + "=" + value + ";";
 
 	std::lock_guard<std::mutex> guard(DB_mtx);
 	if ((query_stat = mysql_query(connection, tmp.c_str())) != 0) {
@@ -240,39 +284,11 @@ std::vector<std::string> split(std::string str, char delimiter) {
 }
 
 #include <conio.h>
-
+#include <cmath>
 
 std::vector <building> list_building;
-typedef struct _fn_info {
-	std::string ap_MAC;
-	int up, right, down, left;
-}_fn_info;
-typedef struct _fn_point {
-	int bid, num_floor;
-	int x, y;
-	std::vector <_fn_info> fn_info;
-}_fn_point;
-typedef struct level_info {
-	std::string ap_name, ap_MAC;
-	int level, freq;
-}level_info;
-#define FILTER 5
-struct find_xy : std::unary_function<_fn_point, bool> {
-	int x, y;
-	find_xy(int x, int y) :x(x) ,y(y) { }
-	bool operator()(_fn_point const& m) const {
-		if (m.x == x && m.y == y)
-			return true;
-		return false;
-	}
-};
-struct find_mac : std::unary_function<_fn_info, bool> {
-	std::string mac;
-	find_mac(std::string mac) :mac(mac) { }
-	bool operator()(_fn_info const& m) const {
-		return m.ap_MAC == mac;
-	}
-};
+
+
 bool in_room(point pos, std::vector <point> poly) {
 	int bef = 0;
 	bool result = false;
@@ -312,57 +328,80 @@ bool in_room(point pos, std::vector <point> poly) {
 	return result;
 }
 
-void fill_fn_point(std::vector <_fn_point> *target, std::vector <std::string> row) {
-	_fn_point tmp = { atoi(row[0].c_str()) ,atoi(row[1].c_str()) ,atoi(row[2].c_str()) ,atoi(row[3].c_str()) };
-	row[2], row[3]; //x, y
-	auto target_pos = std::find_if(target->begin(), target->end(), find_xy(tmp.x, tmp.y));
-	//if()
-	if (target_pos==target->end()) {	//좌표가 없을때
-		_fn_info tmp_info = { row[4] ,atoi(row[5].c_str()) ,atoi(row[6].c_str()),atoi(row[7].c_str()) ,atoi(row[8].c_str()) };
-		tmp.fn_info.push_back(tmp_info);
-		target->push_back(tmp);
-	}
-	else {								//좌표가 있슬때
-		auto vec_pos = std::find_if(target_pos->fn_info.begin(), target_pos->fn_info.end(), find_mac(row[4]));
-		if (vec_pos == target_pos->fn_info.end()) { //좌표 내 중복 MAC 없음
-			_fn_info tmp_info = { row[4] ,atoi(row[5].c_str()) ,atoi(row[6].c_str()),atoi(row[7].c_str()) ,atoi(row[8].c_str()) };
-			target_pos->fn_info.push_back(tmp_info);
-		}
-		
-	}
-}
+//void calc_similarity(std::vector <_fn_point> *fn_point_list, std::vector <level_info> clnt_info) {
+//	for (auto point_iter : *fn_point_list) {
+//		std::vector <double> sim_tmp[4];
+//		double sim_add[4] = { 0 };
+//		for (auto clnt_iter : clnt_info) {
+//			_fn_info* target_info = NULL;
+//			for (auto info_iter : point_iter.fn_info) if (clnt_iter.ap_MAC == info_iter.ap_MAC) { target_info = &info_iter; break; }
+//			double d = 0;
+//			for (auto j : list_building[point_iter.bid].ap_list) if (j.ap_MAC == clnt_iter.ap_MAC) {
+//				d = std::pow(std::pow(j.x - point_iter.x, 2) + std::pow(j.y - point_iter.y, 2), 0.5);
+//				break;
+//			}
+//			if (target_info) {
+//				//d * (1 - std::pow((double)10, (double)(info_iter.up - target_info->level)/20));
+//				sim_tmp[0].push_back(d * (1 - std::pow((double)10, (double)(target_info->level - clnt_iter.level) / 20)));
+//				/*sim_tmp[1].push_back(d * (1 - std::pow((double)10, (double)(target_info->right - clnt_iter.level) / 20)));
+//				sim_tmp[2].push_back(d * (1 - std::pow((double)10, (double)(target_info->down - clnt_iter.level) / 20)));
+//				sim_tmp[3].push_back(d * (1 - std::pow((double)10, (double)(target_info->left - clnt_iter.level) / 20)));*/
+//			}
+//			else {
+//				sim_tmp[0].push_back(d * (1 - std::pow((double)10, (double)5)));
+//				/*sim_tmp[1].push_back(d * (1 - std::pow((double)10, (double)5)));
+//				sim_tmp[2].push_back(d * (1 - std::pow((double)10, (double)5)));
+//				sim_tmp[3].push_back(d * (1 - std::pow((double)10, (double)5)));*/
+//			}
+//		}
+//		for (int i = 0; i < 4; i++) {
+//			for (auto j : sim_tmp[i])
+//				sim_add[i] += j;
+//		}
+//	}
+//}
 
 bool calc(std::string input) {
 	std::string clnt_mac;
 	std::vector <level_info> clnt_info;
-	std::vector <_fn_point> fn_point_up_list, fn_point_right_list, fn_point_down_list, fn_point_left_list;
+	std::vector <_fn_point> fn_point_list;
 	//database->get_fnprint_pos(std::string("40:e3:d6:5f:3e:80"), "up_level", -90, -80);
 	std::vector <std::string> line_vector = split(input, '\n'), patch_row;
 	clnt_mac = line_vector[0];
+	
 	if (!database->exist("employees", "MAC_address", ("'" + clnt_mac + "'").c_str())) {
 		std::cout << clnt_mac + "클라이언트 목록에 없는 유저" << std::endl;
 		return false;
 	}
+
+	std::cout << "employee : " << database->search("employees", "name", "MAC_address", ("'" + clnt_mac + "'").c_str()) << "connected" << std::endl;
+
 	line_vector.erase(line_vector.begin());
 	for (auto i : line_vector) {
 		patch_row = split(i, ' ');
 		if (database->exist("ap_list", "ap_MAC", ("'" + patch_row[1] + "'").c_str())) {
 			level_info tmp = { patch_row[0], patch_row[1], atoi(patch_row[2].c_str()), atoi(patch_row[3].c_str()) };
 			clnt_info.push_back(tmp);
-			std::vector <std::string> fn_vector = split(database->get_fnprint_pos(tmp.ap_MAC, "up_level", tmp.level - FILTER, tmp.level + FILTER), '\n'), fn_row;
-			for (auto j : fn_vector) {
-				fn_row = split(j, ' ');
-				fill_fn_point(&fn_point_up_list, fn_row);
-				//fn_info.push_back(fn_tmp);
-			}
-			fn_vector = split(database->get_fnprint_pos(tmp.ap_MAC, "right_level", tmp.level - FILTER, tmp.level + FILTER), '\n');
-			for (auto j : fn_vector) {
-				fn_row = split(j, ' ');
-				fill_fn_point(&fn_point_right_list, fn_row);
-				//fn_info.push_back(fn_tmp);
-			}
 		}
 	}
+	std::vector <std::string> mac;
+	std::vector <int*> value;
+	for (auto i : clnt_info) {
+		mac.push_back(i.ap_MAC);
+		int v[] = { i.level - FILTER, i.level + FILTER };
+		value.push_back(v);
+	}
+	fn_point_list = database->get_fnprint_data(mac, value);
+	while (fn_point_list.size() == 0) {
+		if (mac.empty() && value.empty()) 
+			break;
+		else {
+			mac.pop_back();
+			value.pop_back();
+		}
+		fn_point_list = database->get_fnprint_data(mac, value);
+	}
+	//calc_similarity(&fn_point_list, clnt_info);
 	/*
 	for (auto i : fn_point_list) {
 		std::cout << i.bid << " " << i.num_floor << " " << i.x << " " << i.y << " : " << std::endl;
@@ -371,30 +410,7 @@ bool calc(std::string input) {
 		std::cout << std::endl;
 	}*/
 }
-//std::vector <std::string> line_vector = split(input, '*');
-//if (database->exist("employees", "MAC_address", ("'" + line_vector[0] + "'").c_str())) {
-//	
-//	line_vector.erase(line_vector.begin());
-//	for (auto i : line_vector) {
-//		std::vector <std::string> patch_row= split(i,' ');
-//		if (database->exist("ap_list", "ap_MAC", ("'" + patch_row[1] + "'").c_str())) {
-//			double level = atof(patch_row[2].c_str());
-//			if (patch_row[0]=="607_5.0" && level >= -90 && level <= -70) {
-//				update_absence(0, "방2");
-//				return;
-//			}
-//			else if (patch_row[0] == "607_5.0" && level >= -35 && level <= -45) {
-//				update_absence(0, "거실&주방");
-//				return;
-//			}
-//			//std::string tmp = database->search("ap_list", "ap_name", "MAC_address", ("'" + patch_row[1] + "'").c_str());
-//			
-//			//std::cout << tmp + ": level" << std::endl;
-//		}
-//		else
-//			continue;
-//	}
-//}
+
 
 
 void init_building(){
@@ -437,12 +453,14 @@ void init_building(){
 				});
 			}
 			tmp.map_list.push_back(tmp_map);
-			std::string ap_data = database->search_eql("ap_list", 1, patch_row[0].c_str(), "bid");
-			std::vector <std::string> ap_vector = split(ap_data, '\n'), patch_row_ap;
-			for (auto ap_iter : ap_vector) {
-				patch_row_ap = split(ap_iter, ' ');
-				ap_point tmp_ap = {atoi(patch_row_ap[1].c_str()), atoi(patch_row_ap[2].c_str()), atoi(patch_row_ap[3].c_str()), atoi(patch_row_ap[4].c_str()) , patch_row_ap[1], atoi(patch_row_ap[1].c_str()), patch_row_ap[1] };
-			}
+			
+		}
+		std::string ap_data = database->search_eql("ap_list", 1, patch_row[0].c_str(), "bid");
+		std::vector <std::string> ap_vector = split(ap_data, '\n'), patch_row_ap;
+		for (auto ap_iter : ap_vector) {
+			patch_row_ap = split(ap_iter, ' ');
+			ap_point tmp_ap = { atoi(patch_row_ap[1].c_str()), atoi(patch_row_ap[2].c_str()), atoi(patch_row_ap[3].c_str()), atoi(patch_row_ap[4].c_str()) , patch_row_ap[5], atoi(patch_row_ap[6].c_str()), patch_row_ap[7] };
+			tmp.ap_list.push_back(tmp_ap);
 		}
 		list_building.push_back(tmp);
 		
