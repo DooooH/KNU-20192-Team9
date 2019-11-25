@@ -7,6 +7,8 @@ import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -32,7 +34,7 @@ public class SocketThread extends Thread {
     }
 
     private void connect() { //소켓 연결
-        String ip = "20.20.1.151"; //연결 IP
+        String ip = "192.168.123.154"; //연결 IP
         int port = 8888; //연결 포트
 
         try {
@@ -97,7 +99,7 @@ public class SocketThread extends Thread {
                     out.flush();
 
                     int size = in.read(inText);
-                    String data = new String(inText, 0, size, "UTF-8");
+                    String data = new String(inText, 0, size, "EUC_KR");
                     Log.i("Read Test", String.format("%d: %s", size, data));
 
                     sendMsg(data);
