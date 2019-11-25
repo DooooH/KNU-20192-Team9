@@ -114,7 +114,7 @@ std::string DB::search_eql(const char* table, int args, ...) {
 }
 
 
-std::vector <_fn_point> DB::get_fnprint_data(std::vector <std::string> MAC, std::vector <int*> value) { // 컬럼 작은거 큰거
+std::vector <_fn_point> DB::get_fnprint_data(std::vector <std::string> MAC, std::vector <int> value) { // 컬럼 작은거 큰거
 	std::string tmp;
 	std::vector <_fn_point> result;
 	std::vector <std::vector<std::string>> list_pos[4];
@@ -122,7 +122,7 @@ std::vector <_fn_point> DB::get_fnprint_data(std::vector <std::string> MAC, std:
 	//std::lock_guard<std::mutex> guard(DB_mtx);
 	for (int d = 0; d < 4; d++) {
 		for (int i = 0; i < MAC.size(); i++) {
-			tmp = "select bid, num_floor, x, y from fn_print where ap_MAC='" + MAC[i] + "' and " + drec[d] + " between " + std::to_string(value[i][0]) + " and " + std::to_string(value[i][1]) + ";";
+			tmp = "select bid, num_floor, x, y from fn_print where ap_MAC='" + MAC[i] + "' and " + drec[d] + " between " + std::to_string(value[i]- FILTER) + " and " + std::to_string(value[i]+FILTER) + ";";
 			DB_mtx.lock();
 			if ((query_stat = mysql_query(connection, tmp.c_str())) != 0) {
 				std::cout << "Mysql 에러 : " << mysql_error(&conn) << std::endl;
@@ -153,8 +153,10 @@ std::vector <_fn_point> DB::get_fnprint_data(std::vector <std::string> MAC, std:
 	for (int d = 0; d < 4; d++) {
 		for (auto list_iter : list_pos[d]) {
 			_fn_point tmp_point = { std::atoi(list_iter[0].c_str()), std::atoi(list_iter[1].c_str()) , std::atoi(list_iter[2].c_str()), std::atoi(list_iter[3].c_str()) };
-			if (std::find_if(result.begin(), result.end(), _fn_point(tmp_point)) != result.end())
+			if (std::find_if(result.begin(), result.end(), _fn_point(tmp_point)) != result.end()) {
 				continue;
+			}
+				
 			DB_mtx.lock();
 			tmp = std::string("") + "select ap_MAC, " + drec[d] +  " from fn_print where bid=" + list_iter[0] + " and num_floor=" + list_iter[1] + " and x=" + list_iter[2] + " and y=" + list_iter[3] + " order by " + drec[d] + " desc;";
 			if ((query_stat = mysql_query(connection, tmp.c_str())) != 0) {
@@ -184,6 +186,27 @@ std::vector <_fn_point> DB::get_fnprint_data(std::vector <std::string> MAC, std:
 	return result;
 	
 }
+//void calc_similarity(std::vector <_fn_point> &fn_point_list, std::vector <level_info> clnt_info) {
+//	for (int i = 0; i < fn_point_list.size(); i++) {
+//		std::vector <double> sim_tmp;
+//		for (auto clnt_iter : clnt_info) {
+//			_fn_info* target_info = NULL;
+//			for (auto info_iter : fn_point_list[i].fn_info) if (clnt_iter.ap_MAC == info_iter.ap_MAC) { target_info = &info_iter; break; }
+//			double d = 0;
+//			for (auto j : list_building[fn_point_list[i].bid].ap_list) if (j.ap_MAC == clnt_iter.ap_MAC) {
+//				d = std::pow(std::pow(j.x - fn_point_list[i].x, 2) + std::pow(j.y - fn_point_list[i].y, 2), 0.5);
+//				break;
+//			}
+//			if (target_info) {
+//				//d * (1 - std::pow((double)10, (double)(info_iter.up - target_info->level)/20));
+//				sim_tmp.push_back(d * (1 - std::pow((double)10, (double)(target_info->level - clnt_iter.level) / 20)));
+//			}
+//			else
+//				sim_tmp.push_back(d * (1 - std::pow((double)10, (double)5)));
+//		}
+//		fn_point_list[i].similarity = sim_tmp;
+//	}
+//}
 std::string DB::search(const char* table, const char* column, const char* key, const char* value) {
 	std::string tmp = "select ", result_str;
 	tmp = tmp + column + " from " + table + " where " + key + "=" + value + ";";
@@ -292,74 +315,146 @@ std::vector <building> list_building;
 bool in_room(point pos, std::vector <point> poly) {
 	int bef = 0;
 	bool result = false;
-	for (int i = 1; i < poly.size(); bef++, i++) {
-		if (poly[bef].x < pos.x && poly[i].x < pos.x) // 두점 모두 왼쪽
-			continue;
+	if (poly.size() == 4 && poly[0].x == poly[1].x && poly[2].x == poly[3].x && poly[0].y == poly[3].y && poly[1].y == poly[2].y) { //직사각형
+		if (pos.x >= poly[0].x && pos.y >= poly[0].y && pos.x <= poly[3].x && pos.y <= poly[2].y)
+			return true;
+		return false;
+	}
+	else {	//다각형
+		for (int i = 1; i < poly.size(); bef++, i++) {
+			if (poly[bef].x < pos.x && poly[i].x < pos.x) // 두점 모두 왼쪽
+				continue;
 
-		point p_1, p_2;  //p1.x < p2.x
-		if (poly[bef].x < poly[i].x) { p_1 = poly[bef]; p_2 = poly[i]; }
-		else { p_1 = poly[i]; p_2 = poly[bef]; }
+			point p_1, p_2;  //p1.x < p2.x
+			if (poly[bef].x < poly[i].x) { p_1 = poly[bef]; p_2 = poly[i]; }
+			else { p_1 = poly[i]; p_2 = poly[bef]; }
 
-		double a, b; //x = ay + b
-		if (p_1.y == p_2.y) {
-			if (pos.y == p_1.y) {
-				if (pos.x < p_1.x)
-					result = !result;
+			double a, b; //x = ay + b
+			if (p_1.y == p_2.y) {
+				if (pos.y == p_1.y) {
+					if (pos.x < p_1.x)
+						result = !result;
+				}
 			}
-		}
-		else if (p_1.x == p_2.x) {
-			if (p_1.y > p_2.y) {
-				if (pos.y >= p_2.y&&pos.y <= p_1.y)
-					result = !result;
+			else if (p_1.x == p_2.x) {
+				if (p_1.y > p_2.y) {
+					if (pos.y >= p_2.y&&pos.y <= p_1.y)
+						result = !result;
+				}
+				else {
+					if (pos.y <= p_2.y&&pos.y >= p_1.y)
+						result = !result;
+				}
 			}
 			else {
-				if (pos.y <= p_2.y&&pos.y >= p_1.y)
+				a = (double)(p_2.x - p_1.x) / (p_2.y - p_1.y);
+				b = p_1.x - a * p_1.y;
+				double tmp = a * pos.y + b;
+				if (tmp >= p_1.x && tmp <= p_2.x)
 					result = !result;
 			}
 		}
-		else {
-			a = (double)(p_2.x - p_1.x) / (p_2.y - p_1.y);
-			b = p_1.x - a * p_1.y;
-			double tmp = a * pos.y + b;
-			if (tmp >= p_1.x && tmp <= p_2.x)
-				result = !result;
-		}
 	}
+	
 	return result;
 }
-
-//void calc_similarity(std::vector <_fn_point> *fn_point_list, std::vector <level_info> clnt_info) {
-//	for (auto point_iter : *fn_point_list) {
-//		std::vector <double> sim_tmp[4];
-//		double sim_add[4] = { 0 };
-//		for (auto clnt_iter : clnt_info) {
-//			_fn_info* target_info = NULL;
-//			for (auto info_iter : point_iter.fn_info) if (clnt_iter.ap_MAC == info_iter.ap_MAC) { target_info = &info_iter; break; }
-//			double d = 0;
-//			for (auto j : list_building[point_iter.bid].ap_list) if (j.ap_MAC == clnt_iter.ap_MAC) {
-//				d = std::pow(std::pow(j.x - point_iter.x, 2) + std::pow(j.y - point_iter.y, 2), 0.5);
-//				break;
-//			}
-//			if (target_info) {
-//				//d * (1 - std::pow((double)10, (double)(info_iter.up - target_info->level)/20));
-//				sim_tmp[0].push_back(d * (1 - std::pow((double)10, (double)(target_info->level - clnt_iter.level) / 20)));
-//				/*sim_tmp[1].push_back(d * (1 - std::pow((double)10, (double)(target_info->right - clnt_iter.level) / 20)));
-//				sim_tmp[2].push_back(d * (1 - std::pow((double)10, (double)(target_info->down - clnt_iter.level) / 20)));
-//				sim_tmp[3].push_back(d * (1 - std::pow((double)10, (double)(target_info->left - clnt_iter.level) / 20)));*/
-//			}
-//			else {
-//				sim_tmp[0].push_back(d * (1 - std::pow((double)10, (double)5)));
-//				/*sim_tmp[1].push_back(d * (1 - std::pow((double)10, (double)5)));
-//				sim_tmp[2].push_back(d * (1 - std::pow((double)10, (double)5)));
-//				sim_tmp[3].push_back(d * (1 - std::pow((double)10, (double)5)));*/
-//			}
-//		}
-//		for (int i = 0; i < 4; i++) {
-//			for (auto j : sim_tmp[i])
-//				sim_add[i] += j;
-//		}
-//	}
-//}
+bool pick_pos(std::vector <_fn_point> fn_point_list) {
+	struct candidate : std::unary_function<candidate, bool> {
+		int bid, num_floor;
+		std::vector <room>::iterator room_iter;
+		std::vector <_fn_point> point_list;
+		candidate(int bid, int num_floor, std::vector <room>::iterator room_iter, _fn_point point_data)
+			: bid(bid), num_floor(num_floor), room_iter(room_iter) {this->point_list.push_back(point_data);}
+		candidate(int bid, int num_floor, std::vector <room>::iterator room_iter) : bid(bid), num_floor(num_floor), room_iter(room_iter) { }
+		bool operator()(candidate const& m) const {
+			if (m.bid == bid && m.num_floor==num_floor && m.room_iter->rname == room_iter->rname)
+				return true;
+			return false;
+		}
+	};
+	std::vector <candidate> cnd_list;
+	
+	for (auto point_iter : fn_point_list) {
+		auto room_list = &list_building[point_iter.bid].map_list[point_iter.num_floor - 1].room_list;
+		for (auto room_iter = room_list->begin(); room_iter < room_list->end(); room_iter++) {
+			if (room_iter->start_x > point_iter.x) 
+				continue;
+			if (in_room({ point_iter.x, point_iter.y }, room_iter->point)) {
+				auto target_cand = std::find_if(cnd_list.begin(), cnd_list.end(), candidate(point_iter.bid, point_iter.num_floor, room_iter));
+				if (target_cand == cnd_list.end()) {
+					candidate tmp = { point_iter.bid, point_iter.num_floor, room_iter, point_iter };
+					cnd_list.push_back(tmp);
+				}
+				else
+					target_cand->point_list.push_back(point_iter);
+				break;
+			}
+		}
+	}
+	std::cout << "방 후보:" << std::endl;
+	for (auto cnd_iter : cnd_list) {
+		std::cout << "bid : " << cnd_iter.bid << " num_floor : " << cnd_iter.num_floor << " room : " << cnd_iter.room_iter->rname << std::endl;
+		for (auto i : cnd_iter.point_list) {
+			std::cout << i.x << " " << i.y << " ";
+			for (auto j : i.similarity)
+				std::cout << j << " ";
+			std::cout << std::endl;
+		}
+		
+	}
+	if (cnd_list.size() != 0) {
+		double min = 0;
+		int min_index = 0;
+		for (auto i : cnd_list[0].point_list) {
+			for (auto j : i.similarity)
+				min += std::fabs(j);
+		}
+		min /= cnd_list[0].point_list.size() * cnd_list[0].point_list[0].similarity.size();
+		for (int i = 1; i < cnd_list.size(); i++) {
+			double min_tmp = 0;
+			for (auto j : cnd_list[i].point_list) {
+				for (auto k : j.similarity)
+					min_tmp += std::fabs(k);
+			}
+			min_tmp /= cnd_list[i].point_list.size() * cnd_list[i].point_list[0].similarity.size();
+			if (min_tmp < min) {
+				min_index = i;
+				min = min_tmp;
+			}
+			else if (min_tmp == min) {
+				if (cnd_list[i].point_list.size() > cnd_list[min].point_list.size()) {
+					min_index = i;
+					min = min_tmp;
+				}
+			}
+		}
+		std::cout << "client is in : " << list_building[cnd_list[min_index].bid].bname << " " << cnd_list[min_index].num_floor << " Floor " << cnd_list[min_index].room_iter->rname << std::endl;
+		return true;
+	}
+	std::cout << "client is absence" << std::endl;
+	return false;
+}
+void calc_similarity(std::vector <_fn_point> &fn_point_list, std::vector <level_info> clnt_info) {
+	for (int i = 0; i < fn_point_list.size();i++) {
+		std::vector <double> sim_tmp;
+		for (auto clnt_iter : clnt_info) {
+			_fn_info* target_info = NULL;
+			for (auto info_iter : fn_point_list[i].fn_info) if (clnt_iter.ap_MAC == info_iter.ap_MAC) { target_info = &info_iter; break; }
+			double d = 0;
+			for (auto j : list_building[fn_point_list[i].bid].ap_list) if (j.ap_MAC == clnt_iter.ap_MAC) {
+				d = std::pow(std::pow(j.x - fn_point_list[i].x, 2) + std::pow(j.y - fn_point_list[i].y, 2), 0.5);
+				break;
+			}
+			if (target_info) {
+				//d * (1 - std::pow((double)10, (double)(info_iter.up - target_info->level)/20));
+				sim_tmp.push_back(d * (1 - std::pow((double)10, (double)(target_info->level - clnt_iter.level) / 20)));
+			}
+			else 
+				sim_tmp.push_back(d * (1 - std::pow((double)10, (double)5)));
+		}
+		fn_point_list[i].similarity = sim_tmp;
+	}
+}
 
 bool calc(std::string input) {
 	std::string clnt_mac;
@@ -385,11 +480,10 @@ bool calc(std::string input) {
 		}
 	}
 	std::vector <std::string> mac;
-	std::vector <int*> value;
+	std::vector <int> value;
 	for (auto i : clnt_info) {
 		mac.push_back(i.ap_MAC);
-		int v[] = { i.level - FILTER, i.level + FILTER };
-		value.push_back(v);
+		value.push_back(i.level);
 	}
 	fn_point_list = database->get_fnprint_data(mac, value);
 	while (fn_point_list.size() == 0) {
@@ -401,7 +495,8 @@ bool calc(std::string input) {
 		}
 		fn_point_list = database->get_fnprint_data(mac, value);
 	}
-	//calc_similarity(&fn_point_list, clnt_info);
+	calc_similarity(fn_point_list, clnt_info);
+	pick_pos(fn_point_list);
 	/*
 	for (auto i : fn_point_list) {
 		std::cout << i.bid << " " << i.num_floor << " " << i.x << " " << i.y << " : " << std::endl;

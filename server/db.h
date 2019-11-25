@@ -9,7 +9,7 @@
 
 #pragma comment (lib , "libmysql.lib")
 
-#define FILTER 5			//+= 5범위로 핑거프린트 좌표 필터링
+#define FILTER 8			//+= 5범위로 핑거프린트 좌표 필터링
 #define FP_DISTANCE 10000	//mm단위
 
 typedef struct _fn_info : std::unary_function<_fn_info, bool> {
@@ -35,7 +35,7 @@ typedef struct _fn_point : std::unary_function<_fn_point, bool> {
 	int bid, num_floor;
 	int x, y;
 	std::vector <_fn_info> fn_info;
-	double similarity;
+	std::vector <double> similarity;
 	_fn_point(int bid, int num_floor, int x, int y) : bid(bid), num_floor(num_floor), x(x), y(y) { }
 	bool operator()(_fn_point const& m) const {
 		if (m.bid == bid && m.num_floor == num_floor && m.x == x && m.y == y)
@@ -98,7 +98,7 @@ public:
 	static bool is_mac(std::string mac);
 	std::string get_all_data(const char* table);
 	std::string search_eql(const char* table, int args, ...);
-	std::vector <_fn_point> get_fnprint_data(std::vector <std::string> MAC, std::vector <int*> value);
+	std::vector <_fn_point> get_fnprint_data(std::vector <std::string> MAC, std::vector <int> value);
 	std::string search(const char* table, const char* column, const char* key, const char* value);
 	
 	bool exist(const char* table, const char* column, const char* target_val);
