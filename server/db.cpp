@@ -153,9 +153,7 @@ std::vector <_fn_point> DB::get_fnprint_data(std::vector <std::string> MAC, std:
 	for (int d = 0; d < 4; d++) {
 		for (auto list_iter : list_pos[d]) {
 			_fn_point tmp_point = { std::atoi(list_iter[0].c_str()), std::atoi(list_iter[1].c_str()) , std::atoi(list_iter[2].c_str()), std::atoi(list_iter[3].c_str()) };
-			if (std::find_if(result.begin(), result.end(), _fn_point(tmp_point)) != result.end()) {
-				continue;
-			}
+			
 				
 			DB_mtx.lock();
 			tmp = std::string("") + "select ap_MAC, " + drec[d] +  " from fn_print where bid=" + list_iter[0] + " and num_floor=" + list_iter[1] + " and x=" + list_iter[2] + " and y=" + list_iter[3] + " order by " + drec[d] + " desc;";
@@ -167,17 +165,36 @@ std::vector <_fn_point> DB::get_fnprint_data(std::vector <std::string> MAC, std:
 			
 			while ((sql_row = mysql_fetch_row(sql_result)) != NULL) {
 				_fn_info tmp_info = { sql_row[0]};
-				if (sql_row[1])
+				if (sql_row[1]) 
 					tmp_info.level = std::atoi(sql_row[1]);
 				else
 					tmp_info.level = -200;
-				
 				tmp_point.fn_info.push_back(tmp_info);
+				double dist = 0;
+				for (auto i : list_building[tmp_point.bid].ap_list) if (i.ap_MAC == tmp_info.ap_MAC) {
+					dist = std::pow(std::pow(i.x - tmp_point.x, 2) + std::pow(i.y - tmp_point.y, 2), 0.5);
+					break;
+				}
+				for (int i = 0; i < MAC.size(); i++) if (MAC[i] == tmp_info.ap_MAC) {
+					//value[i]
+					tmp_point.similarity.push_back(dist * (1 - std::pow((double)10, (double)(tmp_info.level - value[i]) / 20)));
+					break;
+				}	
 			}
-			result.push_back(tmp_point);
-
-
 			mysql_free_result(sql_result);
+			auto dup_pos = std::find_if(result.begin(), result.end(), _fn_point(tmp_point));
+			if (dup_pos  != result.end()) {
+				double dup_sim = 0, tmp_sim = 0;
+				for (int i = 0; i < tmp_point.similarity.size(); i++) { dup_sim += std::fabs(dup_pos->similarity[i]); tmp_sim += std::fabs(tmp_point.similarity[i]); }
+				if (dup_sim > tmp_sim) {
+					for (int i = 0; i <tmp_point.fn_info.size(); i++) 
+						dup_pos->fn_info[i].level = tmp_point.fn_info[i].level;
+					for (int i = 0; i < tmp_point.similarity.size(); i++)
+						dup_pos->similarity[i] = tmp_point.similarity[i];
+				}
+			}
+			else
+				result.push_back(tmp_point);
 			DB_mtx.unlock();
 		}
 		
@@ -495,7 +512,7 @@ bool calc(std::string input) {
 		}
 		fn_point_list = database->get_fnprint_data(mac, value);
 	}
-	calc_similarity(fn_point_list, clnt_info);
+	//calc_similarity(fn_point_list, clnt_info);
 	pick_pos(fn_point_list);
 	/*
 	for (auto i : fn_point_list) {
