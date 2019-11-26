@@ -67,7 +67,7 @@ public class LocationService extends Service {
         } else
             builder = new NotificationCompat.Builder(this);
 
-        builder.setSmallIcon(R.mipmap.ic_launcher).setContentTitle("ILBS is on Service").setContentText("Not Connected.").setContentIntent(pendingIntent);
+        builder.setSmallIcon(R.mipmap.ic_launcher).setContentTitle("서비스가 실행 중입니다.").setContentText("잠시만 기다려주세요...").setContentIntent(pendingIntent);
         startForeground(1, builder.build());
     }
 
@@ -77,6 +77,7 @@ public class LocationService extends Service {
         public void handleMessage(Message msg) {
             if (msg.what == 0) {
                 builder.setContentTitle("현재 건물 안에 없습니다.");
+                builder.setContentText("");
                 startForeground(1, builder.build());
             }
             else if (msg.what == 1){

@@ -7,8 +7,6 @@ import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -34,7 +32,7 @@ public class SocketThread extends Thread {
     }
 
     private void connect() { //소켓 연결
-        String ip = "192.168.123.154"; //연결 IP
+        String ip = "20.20.1.151"; //연결 IP
         int port = 8888; //연결 포트
 
         try {
@@ -64,11 +62,11 @@ public class SocketThread extends Thread {
                     if (!intf.getName().equalsIgnoreCase(interfaceName)) continue;
                 }
                 byte[] mac = intf.getHardwareAddress();
-                if (mac==null) return "";
+                if (mac == null) return "";
                 StringBuilder buf = new StringBuilder();
-                for (int idx=0; idx<mac.length; idx++)
+                for (int idx = 0; idx < mac.length; idx++)
                     buf.append(String.format("%02X:", mac[idx]));
-                if (buf.length()>0) buf.deleteCharAt(buf.length()-1);
+                if (buf.length() > 0) buf.deleteCharAt(buf.length() - 1);
                 return buf.toString();
             }
         } catch (Exception ex) { }
@@ -80,19 +78,24 @@ public class SocketThread extends Thread {
         connect();
 
         if (socket.isConnected()) {
+            byte[] inText = new byte[50];
             onService = true;
+
             while (onService) {
                 try {
-                    byte[] inText = new byte[50];
+                    wifiMan.startScan();
+                    sleep(1000 * 5);
+
                     List<ScanResult> results = wifiMan.getScanResults(); //와이파이 리스트
                     String txt = getMACAddress("wlan0") + "\n";
 
                     Log.i("List Test", String.format("%d network found", results.size()));
                     for (ScanResult result : results) { //와이파이 정보 전송
-                        if (result.SSID.length() > 0 && result.SSID.substring(0,2).equals("E9")) //사용 가능한 와이파이만
+                        if (result.SSID.length() > 0) // 임시조건 && result.SSID.substring(0,2).equals("E9")
                             txt += String.format("%s %s %d %d\n", result.SSID, result.BSSID, result.level, result.frequency);
                         Log.i("List Test", String.format("%s %s %d %d\n", result.SSID, result.BSSID, result.level, result.frequency));
                     }
+                    txt += ";";
 
                     byte[] outText = txt.getBytes();
                     out.write(outText);
@@ -105,7 +108,7 @@ public class SocketThread extends Thread {
                     sendMsg(data);
 
                     disconnect();
-                    sleep(1000 * 60);
+                    sleep(1000 * 55);
                     connect();
 
                 } catch (IOException e) { } catch (InterruptedException e) { onService = false; }
@@ -121,7 +124,7 @@ public class SocketThread extends Thread {
 
         String[] array = data.split(" ");
 
-        if (array[0] == "1") {
+        if (array[0].equals("1")) {
             SimpleDateFormat sdfNow = new SimpleDateFormat("HH:mm:ss");
             String time = "Last Update: " + sdfNow.format(new Date(System.currentTimeMillis()));
             bundle.putString("time", time);
