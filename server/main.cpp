@@ -16,12 +16,12 @@ int main()
 	//win_init()
 	//thread_android.join();
 	thread_DB.join();
-	
+
 
 
 	//server.close_server();
 	::WSACleanup();
 	return 0;
-	
+
 }
 

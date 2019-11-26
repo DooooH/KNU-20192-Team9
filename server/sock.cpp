@@ -1,20 +1,20 @@
-ï»¿#include "sock.h"
+#include "sock.h"
 
 
 SERVER *server;
-std::vector <CLIENT> client_list;
+//std::vector <CLIENT> client_list;
 std::mutex client_list_mtx;
 
 
 SERVER::SERVER() {
 	if ((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == INVALID_SOCKET) {
-		std::cout << "ì„œë²„ì†Œì¼“ ì—ëŸ¬ : ì†Œì¼“ìƒì„±" << std::endl;
+		std::cout << "¼­¹ö¼ÒÄÏ ¿¡·¯ : ¼ÒÄÏ»ý¼º" << std::endl;
 	}
 }
 //SERVER() = delete;
 SERVER::SERVER(ULONG IP, u_short port) {
 	if ((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == INVALID_SOCKET) {
-		std::cout << "ì„œë²„ì†Œì¼“ ì—ëŸ¬ : ì†Œì¼“ìƒì„±" << std::endl;
+		std::cout << "¼­¹ö¼ÒÄÏ ¿¡·¯ : ¼ÒÄÏ»ý¼º" << std::endl;
 		//exit(-1);
 	}
 
@@ -23,11 +23,11 @@ SERVER::SERVER(ULONG IP, u_short port) {
 	addr.sin_port = htons(port);
 
 	if (bind(sock, (sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR) {
-		std::cout << "ì„œë²„ì†Œì¼“ ì—ëŸ¬ : ì†Œì¼“ bind" << std::endl;
+		std::cout << "¼­¹ö¼ÒÄÏ ¿¡·¯ : ¼ÒÄÏ bind" << std::endl;
 		//exit(-1);
 	}
 	if (listen(sock, SOMAXCONN) == SOCKET_ERROR) {
-		std::cout << "ì„œë²„ì†Œì¼“ ì—ëŸ¬ : ì†Œì¼“ listen" << std::endl;
+		std::cout << "¼­¹ö¼ÒÄÏ ¿¡·¯ : ¼ÒÄÏ listen" << std::endl;
 		//exit(-1);
 	}
 }
@@ -47,29 +47,7 @@ SOCKET SERVER::server_accept(sockaddr_in* clnt_addr, int* addrlen) {
 }
 
 
-///////////////////
-CLIENT::CLIENT() { this->sock = NULL; this->addr = { 0 }; }
-CLIENT::CLIENT(SOCKET sock, sockaddr_in addr) {
-	this->sock = sock; this->addr = addr; this->IP = addr.sin_addr.s_addr;
-}
-/*
-CLIENT::CLIENT(SOCKET sock, sockaddr_in addr, std::thread::id thread_id) {
-	this->sock = sock; this->addr = addr; this->IP = addr.sin_addr.s_addr;  this->thread_id = thread_id;
-}*/
-CLIENT::~CLIENT() { closesocket(sock); }
-void CLIENT::close_sock() {
-	closesocket(sock);
-	delete this;
-}
-bool CLIENT::operator==(CLIENT other) { return this == &other; }
-size_t CLIENT::send_msg(char *msg) { return send(this->sock, msg, strlen(msg), NULL); }
-int CLIENT::recv_msg(char (*buf)[MAX_BUF_SIZE]) {
-	int count;
-	if ((count = recv(this->sock, *buf, MAX_BUF_SIZE - 1, 0)) == -1)
-		return -1;
-	(*buf)[count] = '\0';
-	return count;
-}
+
 
 /*
 void CLIENT::_handle() {
@@ -81,7 +59,7 @@ void CLIENT::_handle() {
 		MAC = msg;
 		msg = pos;
 		while (msg != NULL) {
-			//ë¦¬ìŠ¤íŠ¸ íŒŒì‹± ë””ë¹„ëž‘ ì—°ì‚°
+			//¸®½ºÆ® ÆÄ½Ì µðºñ¶û ¿¬»ê
 		}
 	}
 }*/
@@ -89,45 +67,36 @@ void CLIENT::_handle() {
 
 
 void recv_handle(SOCKET clnt) {
-	
-	int recvcnt;
-	char buf[MAX_BUF_SIZE];
-	while (recvcnt = recv(clnt, buf, sizeof(buf) - 1, 0))
-	{
-		if (recvcnt <= 0)
-			continue;
-		buf[recvcnt] = '\0';
-		std::cout << "recv :" << std::endl << buf << std::endl;
-		if (!calc(std::string(buf)))
-			return;
-		buf[0] = '\0';
-		
-	}
-	//std::cout << "asdf";
 
-	/*
-	char *msg = recv_msg(), *pos;
-	if (msg == NULL) return;
-	else {
-		pos = strstr(msg, " ");
-		*(pos)++ = '\0';
-		MAC = msg;
-		msg = pos;
-		while (msg != NULL) {
-			//ë¦¬ìŠ¤íŠ¸ íŒŒì‹± ë””ë¹„ëž‘ ì—°ì‚°
-		}
-	}
-	for (std::vector<CLIENT>::iterator iter = client_list.begin(), eiter = client_list.end(); iter != eiter; iter++) {
-		if (*iter == clnt) {
-			client_list.erase(iter);
-			clnt.close_sock();
+	int recvcnt, total_cnt = 0;
+	char buf[MAX_BUF_SIZE];
+	std::string data;
+	while (recvcnt = recv(clnt, buf, sizeof(buf) - 1, 0)) {
+
+		buf[recvcnt] = '\0';
+		if (buf[recvcnt - 1] == ';') {
+			buf[recvcnt - 1] = '\0';
+			data = data + buf;
+			total_cnt += recvcnt;
 			break;
 		}
-	}*/
+		data = data + buf;
+		total_cnt += recvcnt;
+	}
+
+	if (data.size() <= 0)
+		return;
+
+	std::cout << "recv :" << std::endl << data << std::endl;
+	std::string msg;
+	if (calc(data, msg))
+		send(clnt, msg.c_str(), msg.size(), 0);
+	else
+		std::cout << "error occur" << std::endl;
 	closesocket(clnt);
 }
 int android_server() {
-	
+
 	sockaddr_in addr = { 0 };
 	int addr_len = sizeof(addr);
 	void recv_handle(SOCKET clnt);
@@ -135,11 +104,11 @@ int android_server() {
 	std::thread clnt_thread;
 	SOCKET tmp;
 	while (1) {
-		
-		std::cout << "ì—°ê²° ê¸°ë‹¤ë¦¼" << std::endl;
+
+		std::cout << "¿¬°á ±â´Ù¸²" << std::endl;
 		//CLIENT clnt(server->server_accept(&addr, &addr_len), addr);
 		tmp = server->server_accept(&addr, &addr_len);
-		std::cout << "ìƒˆ ì—°ê²°" << std::endl;
+		std::cout << "»õ ¿¬°á" << std::endl;
 		/*int recvcnt;
 		char buf[500];
 		while (recvcnt = recv(clnt.sock, buf, sizeof(buf) - 1, 0))
@@ -147,14 +116,14 @@ int android_server() {
 			buf[recvcnt] = '\0';
 			printf("%s\n", buf);
 		}*/
-		
-		
+
+
 		//client_list_mtx.lock();
 		//std::lock_guard<std::mutex> guard(client_list_mtx);
 		//client_list.push_back(clnt);
 		//client_list_mtx.unlock();
-		
-		clnt_thread = std::thread (&recv_handle, tmp);
+
+		clnt_thread = std::thread(&recv_handle, tmp);
 		//clnt_thread = std::thread(&_handle, clnt);
 		clnt_thread.detach();
 		std::cout << "end " << std::endl;
@@ -163,7 +132,7 @@ int android_server() {
 		//thread_list_mtx.unlock();
 
 	}
-	
-	std::cout << "ì†Œì¼“í•¸ë“¤ ì¢…ë£Œ" << std::endl;
+
+	std::cout << "¼ÒÄÏÇÚµé Á¾·á" << std::endl;
 	return 0;
 }

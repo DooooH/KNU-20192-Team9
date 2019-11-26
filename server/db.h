@@ -4,7 +4,7 @@
 #include <mysql.h>
 #include <mutex>
 #include <algorithm>
-
+#include <map>
 #include "viewer.h"
 
 #pragma comment (lib , "libmysql.lib")
@@ -54,10 +54,13 @@ typedef struct point {
 	int y;
 }point;
 typedef struct room {
+	int rid;
 	std::string rname;
 	int start_x;
 	int start_y;
+
 	std::vector <point> point;
+
 }room;
 typedef struct map {
 	short num_floor;
@@ -89,7 +92,7 @@ private:
 	MYSQL_ROW sql_row;
 	int query_stat;
 	std::mutex DB_mtx;
-	
+
 public:
 	int class_stat;
 	DB();
@@ -100,7 +103,7 @@ public:
 	std::string search_eql(const char* table, int args, ...);
 	std::vector <_fn_point> get_fnprint_data(std::vector <std::string> MAC, std::vector <int> value);
 	std::string search(const char* table, const char* column, const char* key, const char* value);
-	
+
 	bool exist(const char* table, const char* column, const char* target_val);
 	bool update(const char* table, const char* target, const char* target_val, int args, ...);
 	bool insert(const char* table, int args, ...);
@@ -109,10 +112,12 @@ public:
 
 
 int DB_handle();
-bool calc(std::string input);
+bool calc(std::string input, std::string &output);
 std::vector<std::string> split(std::string str, char delimiter);
 
 
 
 extern DB *database;
 extern std::vector <building> list_building;
+extern std::map <int, std::string> clnt_list;
+extern std::mutex clnt_list_mtx;

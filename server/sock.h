@@ -28,30 +28,10 @@ public:
 
 };
 
-class CLIENT {
-private:
-	std::string MAC;
-	ULONG IP;
-	
-	sockaddr_in addr;
-	//std::thread::id thread_id;
 
-public:
-	SOCKET sock;
-	CLIENT();
-	CLIENT(SOCKET sock, sockaddr_in addr);
-	//CLIENT(SOCKET sock, sockaddr_in addr, std::thread::id thread_id);
-	~CLIENT();
-	void close_sock();
-	bool operator==(CLIENT other);
-	size_t send_msg(char *msg);
-	int recv_msg(char (*buf)[MAX_BUF_SIZE]);
-	/*
-	void _handle();*/
-};
 
 int android_server();
 
 extern SERVER *server;
-extern std::vector <CLIENT> client_list;
+//extern std::vector <CLIENT> client_list;
 extern std::mutex client_list_mtx;

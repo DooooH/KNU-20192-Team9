@@ -3,10 +3,11 @@
 
 nana::form *main_view_ptr;
 nana::listbox *emp_list_ptr;
-
+std::mutex emp_list_mtx;
 
 
 void update_absence(int clnt_id, std::string pos) {
+	std::lock_guard<std::mutex> guard(emp_list_mtx);
 	for (auto i : emp_list_ptr->at(0)) {
 		std::string id = "00" + std::to_string(clnt_id);
 		if (i.text(0) == id) {
@@ -27,7 +28,7 @@ void init_list(nana::listbox *emp_list) {
 		for (int j = 0; j < 3 - size; j++) {
 			patch_row[0] = "0" + patch_row[0];
 		}
-		emp_list->at(0).append({ patch_row[0] , patch_row[1], patch_row[2], "	X" });
+		emp_list->at(0).append({ patch_row[0] , patch_row[1], patch_row[2], "X" });
 
 	}
 	//emp_list.
@@ -310,7 +311,7 @@ void init_view() {
 		draw_form.hide();
 		com_room.hide();
 		com_floor.clear();
-		
+
 		auto pos = com_building.option();
 		for (auto i : list_building[pos].map_list) {
 			com_floor.push_back(std::to_string(i.num_floor));
@@ -321,11 +322,11 @@ void init_view() {
 	bool com_floor_selected = false;
 	com_floor.events().selected([&] {
 		com_floor_selected = true;
-		
+
 		com_room.clear();
 		//com_room.hide();
 		draw_form.hide();
-		
+
 		short bid = com_building.option(), num_floor = com_floor.option();
 		int size_x = list_building[bid].size_x, size_y = list_building[bid].size_y;
 		double per = (size_y > size_x) ? 480.0 / size_y : 480.0 / size_x;
@@ -368,18 +369,36 @@ void init_view() {
 			}
 
 		});
-		
+
 		draw_form.show();
 		com_floor_selected = false;
 		com_room.show();
 	});
-	
+
 	//list_building[bid].map_list[num_floor].room_list;
 	com_room.events().selected([&] {
-		short bid = com_building.option(), num_floor = com_floor.option(), rid = com_room.option();
+		short bid = com_building.option(), num_floor = com_floor.option(), rid = list_building[bid].map_list[num_floor].room_list[com_room.option()].rid;
+
+
 		//popup room info
-		nana::form fm;
-		//fm.modality();
+		nana::form fm(main_view);
+		fm.size({ 400,400 });
+
+		nana::listbox tmp_list(fm);
+		tmp_list.append_header("name");
+		tmp_list.append_header("Absence");
+		//tmp_list.append("Office Staff");
+		//tmp_list.append("Outer Staff"); 
+		std::vector <std::string> line_vector =
+			split(database->search_eql("employees", 3, std::to_string(bid).c_str(), "bid", std::to_string(num_floor + 1).c_str(), "num_floor", std::to_string(rid).c_str(), "rid"), '\n'), patch_row;
+		for (auto i : line_vector) {
+
+		}
+
+		fm.div("<margin[5, 5] list>");
+		fm["list"] << tmp_list;
+		fm.collocate();
+		fm.modality();
 	});
 	com_building.show();
 	//com_floor.show();
