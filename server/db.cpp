@@ -325,10 +325,24 @@ std::vector<std::string> split(std::string str, char delimiter) {
 
 #include <conio.h>
 #include <cmath>
+#include <fstream>
+#include <time.h>
 
 std::vector <building> list_building;
 std::map <int, std::string> clnt_list; //아이디 위치
 std::mutex clnt_list_mtx;
+
+void update_log(int clnt_id, std::string msg) {
+	std::string file_path = std::to_string(clnt_id) + "_log.txt";
+	std::ofstream output(file_path.data(), std::ios::app);
+	if (output.is_open()) {
+		time_t now = time(0);
+		struct tm _t = *localtime(&now);
+		char tmp[80];
+		strftime(tmp, sizeof(tmp), "[%Y / %m / %d] %X : ", &_t);
+		output << (tmp + msg )<< std::endl;
+	}
+}
 
 bool in_room(point pos, std::vector <point> poly) {
 	int bef = 0;
@@ -505,6 +519,7 @@ bool calc(std::string input, std::string &output) {
 			clnt_list.insert(std::pair<int, std::string>(std::stoi(clnt_id), msg));
 		else
 			clnt_list[std::stoi(clnt_id)] = msg;
+		update_log(std::stoi(clnt_id), msg);
 		clnt_list_mtx.unlock();
 		update_absence(std::stoi(clnt_id), msg);
 		output = "1 " + msg + "\r\n";
@@ -516,7 +531,7 @@ bool calc(std::string input, std::string &output) {
 			clnt_list.erase(tmp);
 			clnt_list_mtx.unlock();
 		}
-
+		update_log(std::stoi(clnt_id), msg);
 		update_absence(std::stoi(clnt_id), "X");
 		output = "0\r\n";
 	}

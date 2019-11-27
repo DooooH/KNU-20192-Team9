@@ -377,25 +377,37 @@ void init_view() {
 
 	//list_building[bid].map_list[num_floor].room_list;
 	com_room.events().selected([&] {
-		short bid = com_building.option(), num_floor = com_floor.option(), rid = list_building[bid].map_list[num_floor].room_list[com_room.option()].rid;
-
-
+		short bid = com_building.option(), num_floor = com_floor.option();
+		auto room_ptr = &list_building[bid].map_list[num_floor].room_list[com_room.option()];
 		//popup room info
 		nana::form fm(main_view);
-		fm.size({ 400,400 });
-
+		fm.caption(nana::charset(("Empolyees in " + room_ptr->rname)).to_bytes(nana::unicode::utf8)); // nana::charset(("Empolyees in " + room_ptr->rname)).to_bytes(nana::unicode::utf8)
+		fm.size({ 300,400 });
+		std::map <int, std::string> tmp_map(clnt_list);
 		nana::listbox tmp_list(fm);
 		tmp_list.append_header("name");
 		tmp_list.append_header("Absence");
-		//tmp_list.append("Office Staff");
-		//tmp_list.append("Outer Staff"); 
+		tmp_list.append("Office Staff");
+		tmp_list.append("Outer Staff"); 
 		std::vector <std::string> line_vector =
-			split(database->search_eql("employees", 3, std::to_string(bid).c_str(), "bid", std::to_string(num_floor + 1).c_str(), "num_floor", std::to_string(rid).c_str(), "rid"), '\n'), patch_row;
+			split(database->search_eql("employees", 3, std::to_string(bid).c_str(), "bid", std::to_string(num_floor + 1).c_str(), "num_floor", std::to_string(room_ptr->rid).c_str(), "rid"), '\n'), patch_row;
 		for (auto i : line_vector) {
-
+			patch_row = split(i, ' ');
+			auto tmp_iter = tmp_map.find(std::stoi(patch_row[0]));
+			if (tmp_iter == tmp_map.end()) 
+				tmp_list.at(1).append({ patch_row[1], "X" });
+			else {
+				tmp_list.at(1).append({ patch_row[1], "O" });
+				tmp_map.erase(tmp_iter);
+			}
 		}
-
-		fm.div("<margin[5, 5] list>");
+		std::string current_pos = list_building[bid].bname + " " + std::to_string(num_floor + 1) + "Ãþ " + room_ptr->rname;
+		for (auto i : tmp_map) {
+			if (i.second == current_pos) {
+				tmp_list.at(2).append({ database->search("employees", "name", "id", std::to_string(i.first).c_str()), "O" });
+			}
+		}
+		fm.div("margin=[5, 5] <list>");
 		fm["list"] << tmp_list;
 		fm.collocate();
 		fm.modality();
