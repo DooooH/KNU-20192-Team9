@@ -128,10 +128,10 @@ public class SocketThread extends Thread {
             SimpleDateFormat sdfNow = new SimpleDateFormat("HH:mm:ss");
             String time = "Last Update: " + sdfNow.format(new Date(System.currentTimeMillis()));
             bundle.putString("time", time);
-            String temp = array[1] + " " + array[2] + "층 " + array[3];
+            String temp = array[1] + " " + array[2] + array[3];
             bundle.putString("location", temp);
+            msg.setData(bundle);
         }
-        msg.setData(bundle);
         msg.what = Integer.parseInt(array[0]);
         mHandler.sendMessage(msg);
     }
