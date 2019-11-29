@@ -12,6 +12,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.util.Log;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
@@ -80,9 +81,14 @@ public class LocationService extends Service {
                 builder.setContentText("");
                 startForeground(1, builder.build());
             }
-            else if (msg.what == 1){
+            else if (msg.what == 1) {
                 builder.setContentTitle(msg.getData().getString("location"));
                 builder.setContentText(msg.getData().getString("time"));
+                startForeground(1, builder.build());
+            }
+            else {
+                builder.setContentTitle("연결 오류.");
+                builder.setContentText("");
                 startForeground(1, builder.build());
             }
         }

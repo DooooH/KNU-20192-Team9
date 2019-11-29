@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
+import android.widget.Toast;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -32,7 +33,7 @@ public class SocketThread extends Thread {
     }
 
     private void connect() { //소켓 연결
-        String ip = "20.20.1.151"; //연결 IP
+        String ip = "172.30.1.30"; //연결 IP
         int port = 8888; //연결 포트
 
         try {
@@ -75,9 +76,9 @@ public class SocketThread extends Thread {
 
     @Override
     public void run() {
-        connect();
+       connect();
 
-        if (socket.isConnected()) {
+        if (socket != null && socket.isConnected()) {
             byte[] inText = new byte[50];
             onService = true;
 
@@ -115,6 +116,9 @@ public class SocketThread extends Thread {
             }
             disconnect();
         } //if connected
+        else {
+            sendMsg("2");
+        }
         Log.i("Test Message", "Thread Destroy.");
     } //run
 
@@ -128,7 +132,7 @@ public class SocketThread extends Thread {
             SimpleDateFormat sdfNow = new SimpleDateFormat("HH:mm:ss");
             String time = "Last Update: " + sdfNow.format(new Date(System.currentTimeMillis()));
             bundle.putString("time", time);
-            String temp = array[1] + " " + array[2] + array[3];
+            String temp = array[1] + " " + array[2] + " " + array[3];
             bundle.putString("location", temp);
             msg.setData(bundle);
         }
