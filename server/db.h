@@ -103,7 +103,7 @@ public:
 	std::string search_eql(const char* table, int args, ...);
 	std::vector <_fn_point> get_fnprint_data(std::vector <std::string> MAC, std::vector <int> value);
 	std::string search(const char* table, const char* column, const char* key, const char* value);
-
+	bool exist(const char* table, int args, ...);
 	bool exist(const char* table, const char* column, const char* target_val);
 	bool update(const char* table, const char* target, const char* target_val, int args, ...);
 	bool insert(const char* table, int args, ...);

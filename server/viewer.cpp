@@ -1,15 +1,17 @@
 
 #include "viewer.h"
 
-nana::form *main_view_ptr;
+
 nana::listbox *emp_list_ptr;
 std::mutex emp_list_mtx;
-
+std::vector <employee> emp_vector;
 
 void update_absence(int clnt_id, std::string pos) {
 	std::lock_guard<std::mutex> guard(emp_list_mtx);
 	for (auto i : emp_list_ptr->at(0)) {
-		std::string id = "00" + std::to_string(clnt_id);
+		std::string id = std::to_string(clnt_id);
+		while (id.size() < 3)
+			id = "0" + id;
 		if (i.text(0) == id) {
 			i.text(3, nana::charset(pos).to_bytes(nana::unicode::utf8));
 			return;
@@ -24,10 +26,10 @@ void init_list(nana::listbox *emp_list) {
 
 	for (auto i : line_vector) {
 		patch_row = split(i, ' ');
-		int size = patch_row[0].length();
-		for (int j = 0; j < 3 - size; j++) {
+		while(patch_row[0].size()<3){
 			patch_row[0] = "0" + patch_row[0];
 		}
+		employee tmp = { std::stoi(patch_row[0]) , patch_row[1], patch_row[2], std::stoi(patch_row[0]), std::stoi(patch_row[0]), std::stoi(patch_row[0]) };
 		emp_list->at(0).append({ patch_row[0] , patch_row[1], patch_row[2], "X" });
 
 	}
@@ -90,7 +92,6 @@ void popup(std::string msg, nana::form par) {
 void init_view() {
 	std::string tmp;
 	static nana::form main_view;
-	main_view_ptr = &main_view;
 	const nana::size si = { 1000, 600 };
 	nana::API::track_window_size(main_view, si, true);
 	nana::API::track_window_size(main_view, si, false);
@@ -103,6 +104,7 @@ void init_view() {
 	emp_list.append_header("name");
 	emp_list.append_header("MAC");
 	emp_list.append_header("Absence");
+	
 	init_list(&emp_list);
 	/*if (emp_list.sortable())
 		std::cout << "소트가능";
@@ -223,7 +225,7 @@ void init_view() {
 	db_insert.caption("Add");
 	db_insert.events().click([&] {
 		nana::form fm(main_view);
-		fm.size({ 490,100 });
+		fm.size({ 490,150 });
 
 		nana::label input_id_title{ fm,"<center size=10>ID:</>", true };
 		input_id_title.format(true);
@@ -237,27 +239,63 @@ void init_view() {
 		input_MAC_title.format(true);
 		nana::textbox input_MAC(fm, nana::rectangle{ 330, 30, 150, 20 }, true); input_MAC.multi_lines(false);
 
-		nana::button sub{ fm, nana::rectangle(185, 60, 40, 20), true };
+		nana::label input_building_title{ fm,"<center size=10>Office building:</>", true };
+		input_building_title.format(true);
+		nana::textbox input_building(fm, nana::rectangle{ 10, 70, 150, 20 }, true); input_building.multi_lines(false);
+
+		nana::label input_num_floor_title{ fm,"<center size=10> Floor:</>", true };
+		input_num_floor_title.format(true);
+		nana::textbox input_num_floor(fm, nana::rectangle{ 170, 70, 150, 20 }, true); input_num_floor.multi_lines(false);
+
+		nana::label input_room_title{ fm,"<center size=10> Room:</>", true };
+		input_room_title.format(true);
+		nana::textbox input_room(fm, nana::rectangle{ 330, 70, 150, 20 }, true); input_room.multi_lines(false);
+
+
+		nana::button sub{ fm, nana::rectangle(185, 110, 40, 20), true };
 		sub.caption("Add");
 		sub.events().click([&] {
-			std::string id, name, mac;
-			input_id.getline(0, id); input_name.getline(0, name); input_MAC.getline(0, mac);
+			std::string id, name, mac, building, num_floor, room;
+			input_id.getline(0, id); input_name.getline(0, name); input_MAC.getline(0, mac); input_building.getline(0, building); input_num_floor.getline(0, num_floor); input_room.getline(0, room);
 			if (!DB::is_mac(mac)) {
 				popup("Add fail : Invalid MAC address", fm);
 				fm.close(); return;
 			}
 			//std::cout << id << name << mac;
-
+			
 			if (database->exist("employees", "id", id.c_str()))
 				popup("Add fail: Duplicate ID", fm);
+			else if(database->exist("employees", "MAC_address", ("'" + mac + "'").c_str()))
+				popup("Add fail: Duplicate MAC", fm);
 			else {
-				//name = nana::charset(name).to_bytes(nana::unicode::utf8);
-				//std::wstring tmp;
-				//tmp.assign(name.begin(), name.end());
+				
+				//name = nana::charset(name).to_bytes(nana::unicode::utf8); building = nana::charset(building).to_bytes(nana::unicode::utf8); room = nana::charset(room).to_bytes(nana::unicode::utf8);
+				std::string bid = database->search("building", "bid", "bname", ("'" + building+ "'").c_str()), rid;
+				if (bid.size() == 0) {
+					popup("Add fail: No such a building", fm);
+					fm.close(); return;
+				}
+				bid.pop_back();
+				auto max_floor = std::stoi(database->search("building", "max_floor", "bname", ("'" + building + "'").c_str()));
+				//max_floor.pop_back();
+				if (std::stoi(num_floor) > max_floor) {
+					popup("Add fail: Floor error", fm);
+					fm.close(); return;
+				}
+				auto tmp = database->search_eql("map", 3, bid.c_str(), "bid", num_floor.c_str(), "num_floor", ("'" + room + "'").c_str(), "rname");
+				if (tmp.size() == 0) {
+					popup("Add fail: Room error", fm);
+					fm.close(); return;
+				}
+				std::vector <std::string> tmp_vec = split(tmp, ' ');
+				rid = tmp_vec[2];
+
+
 				std::cout << "insert " << name << std::endl; //
-				if (database->insert("employees", 3, id, "'" + name + "'", "'" + mac + "'")) {
+				if (database->insert("employees", 6, id, "'" + name + "'", "'" + mac + "'", bid, num_floor, rid)){
 					popup("Added Successfully", fm);
-					emp_list.at(0).append({ id, name, mac });
+					while (id.size() < 3) id = "0" + id;
+					emp_list.at(0).append({ id, name, mac , "X"});
 
 					//init_list(&emp_list);
 				}
@@ -267,7 +305,7 @@ void init_view() {
 			//
 			fm.close();
 		});
-		nana::button not_sub{ fm, nana::rectangle(265, 60, 40, 20), true };
+		nana::button not_sub{ fm, nana::rectangle(265, 110, 40, 20), true };
 		not_sub.caption("Quit");
 		not_sub.events().click([&] {
 
@@ -276,9 +314,9 @@ void init_view() {
 
 
 
-		fm.div("margin=10 vert <title><><>");
+		fm.div("margin=10 vert <title><title2><>");
 		fm["title"] << input_id_title << input_name_title << input_MAC_title;
-
+		fm["title2"] << input_building_title << input_num_floor_title << input_room_title;
 		fm.collocate();
 		fm.modality();
 	});

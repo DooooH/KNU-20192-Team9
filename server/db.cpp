@@ -17,9 +17,9 @@ DB::DB(const char* host, const char* user, const char* passwd, const char* db) {
 		class_stat = false;
 		return;
 	}
-	mysql_query(connection, "set session character_set_connection=euckr;");
+	//mysql_query(connection, "set session character_set_connection=euckr;");
 	mysql_query(connection, "set session character_set_results=euckr;");
-	mysql_query(connection, "set session character_set_client=euckr;");
+	//mysql_query(connection, "set session character_set_client=euckr;");
 	class_stat = true;
 }
 bool DB::exit_db() {
@@ -263,6 +263,29 @@ bool DB::exist(const char* table, const char* column, const char* target_val) {
 	else
 		return false;
 }
+bool DB::exist(const char* table, int args, ...) {
+	std::string tmp = "select EXISTS(select * from ";
+	tmp = tmp + table + " where ";
+	va_list ap;
+	va_start(ap, args);
+	for (int i = 0; i < args - 1; i++) {
+		tmp = tmp + va_arg(ap, std::string) + " and "; //케릭터 형태로 받는게 오버헤드 적음
+	}
+	tmp = tmp + va_arg(ap, std::string) + ") as success";
+	va_end(ap);
+	std::lock_guard<std::mutex> guard(DB_mtx);
+	if ((query_stat = mysql_query(connection, tmp.c_str())) != 0) {
+		std::cout << "Mysql 에러 : " << mysql_error(&conn) << std::endl;
+		return NULL;
+	}
+	sql_result = mysql_store_result(connection);
+	sql_row = mysql_fetch_row(sql_result);
+	mysql_free_result(sql_result);
+	if (atoi(*sql_row))
+		return true;
+	else
+		return false;
+}
 bool DB::update(const char* table, const char* target, const char* target_val, int args, ...) {
 	std::string tmp = "update ";
 	tmp = tmp + table + " set ";
@@ -483,7 +506,7 @@ bool calc(std::string input, std::string &output) {
 		std::cout << clnt_mac + "클라이언트 목록에 없는 유저" << std::endl;
 		return false;
 	}
-	std::string clnt_id = database->search("employees", "id", "MAC_address", ("'" + clnt_mac + "'").c_str());
+	int clnt_id = std::stoi(database->search("employees", "id", "MAC_address", ("'" + clnt_mac + "'").c_str()));
 	std::cout << "employee : " << database->search("employees", "name", "MAC_address", ("'" + clnt_mac + "'").c_str()) << "connected" << std::endl;
 
 	line_vector.erase(line_vector.begin());
@@ -513,27 +536,27 @@ bool calc(std::string input, std::string &output) {
 	std::string msg;
 	//calc_similarity(fn_point_list, clnt_info);
 	if (pick_pos(fn_point_list, msg)) {
-		auto tmp = clnt_list.find(std::stoi(clnt_id));
+		auto tmp = clnt_list.find(clnt_id);
 		clnt_list_mtx.lock();
 		if (tmp == clnt_list.end())
-			clnt_list.insert(std::pair<int, std::string>(std::stoi(clnt_id), msg));
+			clnt_list.insert(std::pair<int, std::string>(clnt_id, msg));
 		else
-			clnt_list[std::stoi(clnt_id)] = msg;
-		update_log(std::stoi(clnt_id), msg);
+			clnt_list[clnt_id] = msg;
+		update_log(clnt_id, msg);
 		clnt_list_mtx.unlock();
-		update_absence(std::stoi(clnt_id), msg);
-		output = "1 " + msg + "\r\n";
+		update_absence(clnt_id, msg);
+		output = "1 " + msg;
 	}
 	else {
-		auto tmp = clnt_list.find(std::stoi(clnt_id));
+		auto tmp = clnt_list.find(clnt_id);
 		if (tmp != clnt_list.end()) {
 			clnt_list_mtx.lock();
 			clnt_list.erase(tmp);
 			clnt_list_mtx.unlock();
 		}
-		update_log(std::stoi(clnt_id), msg);
-		update_absence(std::stoi(clnt_id), "X");
-		output = "0\r\n";
+		update_log(clnt_id, msg);
+		update_absence(clnt_id, "X");
+		output = "0";
 	}
 	return true;
 	/*
