@@ -1,0 +1,8 @@
+use project;
+
+select * from employees;
+select * from building;
+select * from map;
+select * from room;
+select * from ap_list;
+select * from fn_print;
