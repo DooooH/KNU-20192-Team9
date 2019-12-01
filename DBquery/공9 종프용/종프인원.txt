@@ -1,0 +1,35 @@
+use project;
+show tables;
+
+create table employees(
+	id int(4) not null primary key,
+	name char(20),
+	MAC_address char(18),
+	bid int(2) not null,
+	num_floor int(4) not null,
+	rid int(2) not null
+	foreign key(bid, num_floor, rid) references map(bid, num_floor, rid) on update cascade,
+	index index_employees(id)
+);
+
+insert into employees values(0, 'jaeuk', 'A8:2B:B9:87:E5:F0', 0, 4, 1);
+insert into employees values(1, 'jisoo', '64:7B:CE:31:24:74', 0, 4, 2);
+insert into employees values(2, 'dohyung_galaxy7', 'A4:84:31:F8:2F:2E', 0, 4, 3);
+insert into employees values(3, 'employee1', 'A4:84:31:F8:2F:20', 0, 4, 1);
+insert into employees values(4, 'employee1', 'A4:84:31:F8:2F:21', 0, 4, 1);
+insert into employees values(5, 'employee1', 'A4:84:31:F8:2F:22', 0, 4, 1);
+insert into employees values(6, 'employee1', 'A4:84:31:F8:2F:23', 0, 4, 2);
+insert into employees values(7, 'employee1', 'A4:84:31:F8:2F:24', 0, 4, 2);
+insert into employees values(8, 'employee1', 'A4:84:31:F8:2F:25', 0, 4, 2);
+insert into employees values(9, 'employee1', 'A4:84:31:F8:2F:26', 0, 4, 3);
+insert into employees values(10, 'employee1', 'A4:84:31:F8:2F:27', 0, 4, 3);
+insert into employees values(11, 'employee1', 'A4:84:31:F8:2F:28', 0, 4, 3);
+insert into employees values(12, 'employee1', 'A4:84:31:F8:2F:29', 0, 4, 4);
+insert into employees values(13, 'employee1', 'A4:84:31:F8:2F:30', 0, 4, 4);
+insert into employees values(14, 'employee1', 'A4:84:31:F8:2F:31', 0, 4, 4);
+insert into employees values(15, 'employee1', 'A4:84:31:F8:2F:32', 0, 5, 1);
+insert into employees values(16, 'employee1', 'A4:84:31:F8:2F:33', 0, 5, 1);
+insert into employees values(17, 'employee1', 'A4:84:31:F8:2F:34', 0, 5, 1);
+
+
+select * from employees;
