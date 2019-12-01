@@ -2,7 +2,7 @@
 
 
 SERVER *server;
-std::vector <CLIENT> client_list;
+//std::vector <CLIENT> client_list;
 std::mutex client_list_mtx;
 
 
@@ -47,30 +47,7 @@ SOCKET SERVER::server_accept(sockaddr_in* clnt_addr, int* addrlen) {
 }
 
 
-///////////////////
-CLIENT::CLIENT() { this->sock = NULL; this->addr = { 0 }; }
-CLIENT::CLIENT(SOCKET sock, sockaddr_in addr) {
-	this->sock = sock; this->addr = addr; this->IP = addr.sin_addr.s_addr;
-}
-/*
-CLIENT::CLIENT(SOCKET sock, sockaddr_in addr, std::thread::id thread_id) {
-	this->sock = sock; this->addr = addr; this->IP = addr.sin_addr.s_addr;  this->thread_id = thread_id;
-}*/
-CLIENT::~CLIENT() { closesocket(sock); }
-void CLIENT::close_sock() {
-	closesocket(sock);
-	delete this;
-}
-bool CLIENT::operator==(CLIENT other) { return this == &other; }
-size_t CLIENT::send_msg(char *msg) { return send(this->sock, msg, strlen(msg), NULL); }
-char* CLIENT::recv_msg() {
-	static char tmp[2048];
-	int count;
-	if ((count = recv(this->sock, tmp, MAX_BUF_SIZE, NULL)) == 0)
-		return NULL;
-	tmp[count] = '\0';
-	return tmp;
-}
+
 
 /*
 void CLIENT::_handle() {
@@ -89,53 +66,73 @@ void CLIENT::_handle() {
 
 
 
-void _handle(CLIENT clnt) {
-	//std::cout << "asdf";
+void recv_handle(SOCKET clnt) {
 
-	/*
-	char *msg = recv_msg(), *pos;
-	if (msg == NULL) return;
-	else {
-		pos = strstr(msg, " ");
-		*(pos)++ = '\0';
-		MAC = msg;
-		msg = pos;
-		while (msg != NULL) {
-			//리스트 파싱 디비랑 연산
-		}
-	}*/
-	for (std::vector<CLIENT>::iterator iter = client_list.begin(), eiter = client_list.end(); iter != eiter; iter++) {
-		if (*iter == clnt) {
-			client_list.erase(iter);
-			clnt.close_sock();
+	int recvcnt, total_cnt = 0;
+	char buf[MAX_BUF_SIZE];
+	std::string data;
+	while (recvcnt = recv(clnt, buf, sizeof(buf) - 1, 0)) {
+
+		buf[recvcnt] = '\0';
+		if (buf[recvcnt - 1] == ';') {
+			buf[recvcnt - 1] = '\0';
+			data = data + buf;
+			total_cnt += recvcnt;
 			break;
 		}
+		data = data + buf;
+		total_cnt += recvcnt;
 	}
-}
 
+	if (data.size() <= 0)
+		return;
+
+	std::cout << "recv :" << std::endl << data << std::endl;
+	std::string msg;
+	if (calc(data, msg))
+		send(clnt, msg.c_str(), msg.size(), 0);
+	else
+		std::cout << "error occur" << std::endl;
+	closesocket(clnt);
+}
 int android_server() {
-	SOCKET tmp;
+
 	sockaddr_in addr = { 0 };
 	int addr_len = sizeof(addr);
-
-	server = &SERVER(INADDR_ANY, (u_short)9999);
-
+	void recv_handle(SOCKET clnt);
+	server = &SERVER(INADDR_ANY, (u_short)8888);
+	std::thread clnt_thread;
+	SOCKET tmp;
 	while (1) {
-		std::thread clnt_thread;
+
+		std::cout << "연결 기다림" << std::endl;
+		//CLIENT clnt(server->server_accept(&addr, &addr_len), addr);
 		tmp = server->server_accept(&addr, &addr_len);
-		//tmp = accept(server->sock, (sockaddr*)&addr, &addr_len);
-		CLIENT clnt(tmp, addr);
-		//std::cout << "새 연결" << std::endl;
-		std::lock_guard<std::mutex> guard(client_list_mtx);
-		client_list.push_back(clnt);
-		client_list_mtx.unlock();
-		clnt_thread = std::thread(&_handle, clnt);
+		std::cout << "새 연결" << std::endl;
+		/*int recvcnt;
+		char buf[500];
+		while (recvcnt = recv(clnt.sock, buf, sizeof(buf) - 1, 0))
+		{
+			buf[recvcnt] = '\0';
+			printf("%s\n", buf);
+		}*/
+
+
+		//client_list_mtx.lock();
+		//std::lock_guard<std::mutex> guard(client_list_mtx);
+		//client_list.push_back(clnt);
+		//client_list_mtx.unlock();
+
+		clnt_thread = std::thread(&recv_handle, tmp);
+		//clnt_thread = std::thread(&_handle, clnt);
 		clnt_thread.detach();
+		std::cout << "end " << std::endl;
 		//std::lock_guard<std::mutex> guard(thread_list_mtx);
 		//thread_list.push_back(clnt_thread);
 		//thread_list_mtx.unlock();
 
 	}
 
+	std::cout << "소켓핸들 종료" << std::endl;
 	return 0;
 }
